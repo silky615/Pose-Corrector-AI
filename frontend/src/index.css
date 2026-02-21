@@ -1,0 +1,159 @@
+:root{
+  --bg-1: #0f172a;         /* deep navy */
+  --bg-2: #0b3140;         /* teal-ish */
+  --accent-1: #7c3aed;     /* violet */
+  --accent-2: #06b6d4;     /* cyan */
+  --card: rgba(255,255,255,0.06);
+  --glass: rgba(255,255,255,0.06);
+  --muted: #bcd4d9;
+}
+
+/* Page background gradient */
+.app-bg{
+  min-height:100vh;
+  background: radial-gradient(1200px 600px at 10% 20%, rgba(124,58,237,0.12), transparent),
+              radial-gradient(800px 400px at 90% 80%, rgba(6,182,212,0.08), transparent),
+              linear-gradient(180deg,var(--bg-1), var(--bg-2));
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:40px 20px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color: #e6f7f9;
+}
+
+/* Logo & header */
+.logo-header{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin-bottom:18px;
+  text-align:left;
+}
+.logo-badge{
+  width:60px;
+  height:60px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+  color:white;
+  font-size:20px;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  box-shadow: 0 8px 30px rgba(12,20,40,0.45);
+}
+.project-title{
+  margin:0;
+  font-size:18px;
+  letter-spacing:0.2px;
+}
+.project-sub{
+  margin:0;
+  margin-top:4px;
+  font-size:12px;
+  color:var(--muted);
+}
+
+/* Card styles */
+.center-wrap{ width:100%; max-width:960px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+
+.card{
+  width:100%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius:14px;
+  padding:22px;
+  box-shadow: 0 8px 24px rgba(2,6,23,0.6);
+  backdrop-filter: blur(8px) saturate(120%);
+  border: 1px solid rgba(255,255,255,0.03);
+}
+
+/* Hero card */
+.hero-card{
+  max-width:720px;
+  text-align:center;
+  padding:36px;
+}
+.hero-card h2{ margin:0 0 6px 0; font-size:24px; }
+.muted{ color:var(--muted); margin-bottom:18px; }
+
+/* Buttons */
+.button-row{ display:flex; gap:12px; justify-content:center; margin-top:18px; }
+.btn{
+  padding:10px 16px;
+  border-radius:10px;
+  font-weight:600;
+  cursor:pointer;
+  border: none;
+  transition: transform .12s ease, box-shadow .12s ease;
+  min-width:140px;
+}
+.btn:active{ transform: translateY(1px); }
+.btn.primary{
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+  color:white;
+  box-shadow: 0 8px 18px rgba(124,58,237,0.16);
+}
+.btn.outline{
+  background:transparent;
+  color:var(--accent-2);
+  border:1px solid rgba(255,255,255,0.06);
+}
+.btn.ghost{
+  background:transparent;
+  color:var(--muted);
+}
+
+/* Form card */
+.form-card{ max-width:540px; padding:24px; }
+.form-card.wide{ max-width:760px; }
+.form-card h2{ margin-top:0; margin-bottom:6px; }
+
+/* Form layout */
+.form{ display:flex; flex-direction:column; gap:12px; margin-top:6px; }
+.form.grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:12px;
+}
+.form label{ display:flex; flex-direction:column; font-size:13px; color: #eaf6f8; }
+.form input[type="text"],
+.form input[type="email"],
+.form input[type="password"],
+.form input[type="number"]{
+  margin-top:8px;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.02);
+  color: #eaf6f8;
+  outline: none;
+  transition: box-shadow .12s ease, border-color .12s ease;
+}
+.form input::placeholder{ color: rgba(255,255,255,0.35); font-size:13px; }
+.form input:focus{
+  box-shadow: 0 6px 18px rgba(6,182,212,0.08);
+  border-color: rgba(6,182,212,0.45);
+}
+
+/* Inline row (checkbox + text) */
+.row-inline{ display:flex; align-items:center; gap:8px; margin-top:6px; color:var(--muted); }
+.row-inline input[type="checkbox"]{ width:16px; height:16px; }
+
+/* Full width button row in forms */
+.button-row.fullwidth{ justify-content:space-between; grid-column: 1 / -1; }
+
+/* Error */
+.error{ color:#ffb4b4; background: rgba(255,180,180,0.04); padding:8px 10px; border-radius:8px; font-size:13px; }
+
+/* Footer */
+.footer{ margin-top:28px; color:var(--muted); font-size:13px; }
+
+/* Responsive */
+@media (max-width:760px){
+  .form.grid{ grid-template-columns: 1fr; }
+  .hero-card{ padding:22px; }
+  .logo-badge{ width:48px; height:48px; font-size:16px; }
+}
+
