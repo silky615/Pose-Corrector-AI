@@ -1,9 +1,12 @@
 from pathlib import Path
-import pymysql
-pymysql.install_as_MySQLdb()
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Use SQLite by default (no MySQL required). Set USE_MYSQL=1 to use MySQL.
+if os.environ.get("USE_MYSQL"):
+    import pymysql
+    pymysql.install_as_MySQLdb()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-rrkht2+%o9)t!upnyb@t7$bcz%x2_4j*1upb=6&@n_*#1ru847"
@@ -73,17 +76,23 @@ WSGI_APPLICATION = "exercise_correction.wsgi.application"
 
 DATABASES = {
     'default': {
-        'ENGINE':   'django.db.backends.mysql',
-        'NAME':     'exercise_correction',
-        'USER':     'root',
-        'PASSWORD': 'NewPassword123!',
-        'HOST':     '127.0.0.1',
-        'PORT':     '3306',
-        'OPTIONS': {
-            'charset': 'utf8mb4',
-        },
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# To use MySQL instead, set env USE_MYSQL=1 and use:
+# DATABASES = {
+#     'default': {
+#         'ENGINE':   'django.db.backends.mysql',
+#         'NAME':     os.environ.get('DB_NAME', 'exercise_correction'),
+#         'USER':     os.environ.get('DB_USER', 'root'),
+#         'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+#         'HOST':     os.environ.get('DB_HOST', '127.0.0.1'),
+#         'PORT':     os.environ.get('DB_PORT', '3306'),
+#         'OPTIONS': {'charset': 'utf8mb4'},
+#     }
+# }
 
 # Internationalization
 LANGUAGE_CODE = "en-us"
@@ -103,4 +112,5 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:3000",
 ]

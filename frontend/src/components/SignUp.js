@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import LogoHeader from "./LogoHeader";
+import * as api from "../api";
 
 export default function SignUp({ onNavigate }) {
   const [form, setForm] = useState({
@@ -30,19 +31,37 @@ export default function SignUp({ onNavigate }) {
     return "";
   }
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     setError("");
     const v = validate();
     if (v) return setError(v);
 
-    const displayName = form.useEmailAsUsername ? form.email : form.username.trim();
-    localStorage.setItem("pc_demo_email", form.email);
-    localStorage.setItem("pc_demo_username", displayName);
-    console.log("Signup payload (demo):", form);
-    alert(`Account created for ${form.fullname} (demo). You will appear as "${displayName}".`);
-    setForm({ fullname: "", username: "", useEmailAsUsername: true, age: "", email: "", height: "", weight: "", password: "" });
-    onNavigate("signin");
+    const parts = form.fullname.trim().split(/\s+/);
+    const firstName = parts[0] || "";
+    const lastName = parts.slice(1).join(" ") || "";
+
+    const payload = {
+      firstName,
+      lastName,
+      email: form.email,
+      password: form.password,
+      age: form.age ? Number(form.age) : undefined,
+      height: form.height ? Number(form.height) : undefined,
+      weight: form.weight ? Number(form.weight) : undefined,
+    };
+
+    try {
+      const data = await api.signup(payload);
+      const displayName = form.useEmailAsUsername ? form.email : form.username.trim();
+      localStorage.setItem("pc_demo_email", form.email);
+      localStorage.setItem("pc_demo_user_id", String(data.user_id));
+      localStorage.setItem("pc_demo_username", data.name || displayName);
+      setForm({ fullname: "", username: "", useEmailAsUsername: true, age: "", email: "", height: "", weight: "", password: "" });
+      onNavigate("signin");
+    } catch (err) {
+      setError(err.message || "Sign up failed");
+    }
   }
 
   return (

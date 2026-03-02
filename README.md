@@ -1,32 +1,59 @@
-# Pose-Corrector-AI  
-AI-powered exercise form correction system using pose estimation and machine learning models.
+# Pose Corrector App
 
-This project uses **MediaPipe pose detection** and **ML classifiers** to analyze exercise form and provide feedback on common home workouts. The goal is to help users perform exercises safely and correctly by identifying incorrect posture or movement patterns.
+Single folder containing the full **Pose Corrector AI** stack: **frontend** (Silky) and **backend** (Prakriti) with auth, video upload, and live pose analysis connected.
 
----
+## Structure
 
-## Project Intro
+```
+Pose-Corrector-App/
+├── frontend/     # React app (Silky) – UI, auth, upload, live camera
+├── backend/      # Django + ML (Prakriti) – API, pose models, exercise detection
+└── README.md     # This file
+```
 
-We are building an AI-based system that can analyze uploaded workout videos and classify whether the user is performing an exercise with proper form.
+## Quick start
 
-The project focuses on **five exercises**:
+### 1. Backend
 
-- **Bicep Curl**
-- **Plank**
-- **Squat**
-- **Lunge**
-- **Shoulder Press** *(or another 5th exercise finalized by the team)*
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+# Configure database in backend/exercise_correction/settings.py (e.g. MySQL)
+python manage.py migrate
+python manage.py runserver 8000
+```
 
-Each exercise will have its own machine learning model trained to detect common form mistakes and provide corrective feedback.
+API base: `http://localhost:8000` (e.g. `/api/auth/signin`, `/api/video/stream`, `/api/video/upload`).
 
-A simple **web application** will allow users to upload videos and receive form analysis results.
+### 2. Frontend
 
----
+```bash
+cd frontend
+cp .env.example .env
+# Set REACT_APP_API_URL=http://localhost:8000 in .env
+npm install
+npm start
+```
 
-## How It Works (High-Level Overview)
+App: `http://localhost:3000`. It will call the backend at the URL set in `.env`.
 
-1. User uploads a workout video  
-2. MediaPipe extracts pose keypoints  
-3. Keypoints are converted into angles/features  
-4. ML model classifies the form (Correct / Incorrect types)  
-5. Web app displays feedback and improvement suggestions  
+## What’s included
+
+- **Auth:** Sign up / Sign in → backend `api` app and DB.
+- **Upload:** Video file → `POST /api/video/upload` → accuracy, message, reps.
+- **Live:** Camera + MediaPipe Pose in browser → landmarks → `POST /api/video/stream` → real-time feedback and rep count.
+
+Exercise IDs are mapped automatically (e.g. `tree-pose` → `tree_pose`, `pushup` → `push_up`).
+
+## Backend requirements
+
+- Python 3.8+
+- Database (e.g. MySQL) and settings in `backend/exercise_correction/settings.py`
+- ML model files in `backend/static/model/` (e.g. `*_model.pkl`, `*_input_scaler.pkl`) if you use the full detection pipeline.
+
+## Frontend requirements
+
+- Node 18+
+- `REACT_APP_API_URL` in `frontend/.env` pointing at the backend (e.g. `http://localhost:8000`).

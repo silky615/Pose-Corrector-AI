@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import LogoHeader from "./LogoHeader";
+import * as api from "../api";
 
 export default function SignIn({ onNavigate }) {
   const [email, setEmail] = useState("");
@@ -23,22 +24,22 @@ export default function SignIn({ onNavigate }) {
     return "";
   }
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     setError("");
     const v = validate();
     if (v) return setError(v);
 
-    // demo auth: accept password 'password123'
-    if (password !== "password123") {
-      return setError("Invalid credentials (demo). Try password123");
+    try {
+      const data = await api.signin(email, password);
+      if (remember) localStorage.setItem("pc_demo_email", email);
+      else localStorage.removeItem("pc_demo_email");
+      localStorage.setItem("pc_demo_user_id", String(data.user_id));
+      localStorage.setItem("pc_demo_username", data.name || data.email || email);
+      onNavigate("dashboard");
+    } catch (err) {
+      setError(err.message || "Sign in failed");
     }
-    if (remember) localStorage.setItem("pc_demo_email", email);
-    else localStorage.removeItem("pc_demo_email");
-    // If no username stored (e.g. never signed up), show email as display name
-    if (!localStorage.getItem("pc_demo_username")) localStorage.setItem("pc_demo_username", email);
-
-    onNavigate("dashboard");
   }
 
   return (

@@ -30,9 +30,18 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-# --- lightweight geometry helpers (used for squat posture_ok) ---
-def _dist(a, b) -> float:
-    return float(((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5)
+# --- Exercise logic: constants and pure helpers (single place for all exercise logic) ---
+from api.exercise_logic import (
+    _dist,
+    BICEP_IMPORTANT_LANDMARKS,
+    PLANK_IMPORTANT_LANDMARKS,
+    SQUAT_IMPORTANT_LANDMARKS,
+    POSE_LANDMARK_INDEX,
+    KEY_LANDMARKS_FOR_ACCURACY,
+    IDEAL_POSES,
+    _accuracy_vs_ideal,
+    _ideal_landmarks_for_response,
+)
 
 # Lazy import detection modules to prevent startup crashes
 def get_exercise_detection():
@@ -167,109 +176,7 @@ def get_models():
     
     return _models_cache
 
-# --- Feature extraction helpers to match training pipelines ---
-
-# These landmark sets mirror the ones used in the offline training code
-BICEP_IMPORTANT_LANDMARKS = [
-    "NOSE",
-    "LEFT_SHOULDER",
-    "RIGHT_SHOULDER",
-    "RIGHT_ELBOW",
-    "LEFT_ELBOW",
-    "RIGHT_WRIST",
-    "LEFT_WRIST",
-    "LEFT_HIP",
-    "RIGHT_HIP",
-]
-
-PLANK_IMPORTANT_LANDMARKS = [
-    "NOSE",
-    "LEFT_SHOULDER",
-    "RIGHT_SHOULDER",
-    "LEFT_ELBOW",
-    "RIGHT_ELBOW",
-    "LEFT_WRIST",
-    "RIGHT_WRIST",
-    "LEFT_HIP",
-    "RIGHT_HIP",
-    "LEFT_KNEE",
-    "RIGHT_KNEE",
-    "LEFT_ANKLE",
-    "RIGHT_ANKLE",
-    "LEFT_HEEL",
-    "RIGHT_HEEL",
-    "LEFT_FOOT_INDEX",
-    "RIGHT_FOOT_INDEX",
-]
-
-SQUAT_IMPORTANT_LANDMARKS = [
-    "NOSE",
-    "LEFT_SHOULDER",
-    "RIGHT_SHOULDER",
-    "LEFT_HIP",
-    "RIGHT_HIP",
-    "LEFT_KNEE",
-    "RIGHT_KNEE",
-    "LEFT_ANKLE",
-    "RIGHT_ANKLE",
-]
-
-# Ideal pose landmarks (normalized 0-1) for accuracy vs ideal; used by tree_pose and plank
-IDEAL_POSES = {
-    "tree_pose": {
-        "hold": {
-            0: (0.50, 0.10), 11: (0.45, 0.25), 12: (0.55, 0.25),
-            13: (0.40, 0.35), 14: (0.60, 0.35), 15: (0.42, 0.15), 16: (0.58, 0.15),
-            23: (0.48, 0.45), 24: (0.52, 0.45), 25: (0.48, 0.65), 26: (0.52, 0.55),
-            27: (0.48, 0.90), 28: (0.52, 0.60),
-        },
-    },
-    "plank": {
-        "hold": {
-            0: (0.50, 0.40), 11: (0.40, 0.35), 12: (0.60, 0.35),
-            13: (0.30, 0.45), 14: (0.70, 0.45), 15: (0.25, 0.50), 16: (0.75, 0.50),
-            23: (0.43, 0.35), 24: (0.57, 0.35), 25: (0.43, 0.55), 26: (0.57, 0.55),
-            27: (0.43, 0.70), 28: (0.57, 0.70),
-        },
-    },
-}
-
-KEY_LANDMARKS_FOR_ACCURACY = [11, 12, 23, 24, 25, 26, 27, 28]
-
-def _accuracy_vs_ideal(landmarks_json: list, ideal_dict: dict) -> float:
-    """Compare actual landmarks to ideal pose; return 0-100 accuracy."""
-    if not ideal_dict or not landmarks_json or len(landmarks_json) < 29:
-        return 0.0
-    total_error = 0.0
-    valid = 0
-    for idx in KEY_LANDMARKS_FOR_ACCURACY:
-        if idx >= len(landmarks_json) or idx not in ideal_dict:
-            continue
-        lm = landmarks_json[idx]
-        if lm is None:
-            continue
-        if isinstance(lm, dict):
-            vis = lm.get("visibility", 1.0)
-            ax, ay = lm.get("x", 0), lm.get("y", 0)
-        else:
-            vis = getattr(lm, "visibility", 1.0)
-            ax, ay = getattr(lm, "x", 0), getattr(lm, "y", 0)
-        if vis < 0.5:
-            continue
-        ix, iy = ideal_dict[idx]
-        total_error += float(((ax - ix) ** 2 + (ay - iy) ** 2) ** 0.5)
-        valid += 1
-    if valid == 0:
-        return 0.0
-    avg_error = total_error / valid
-    acc = (1.0 - (avg_error / 0.25)) * 100.0
-    return max(0.0, min(100.0, acc))
-
-def _ideal_landmarks_for_response(ideal_dict: dict):
-    """Return ideal landmarks as JSON-friendly dict for frontend (string keys)."""
-    if not ideal_dict:
-        return None
-    return {str(k): [float(v[0]), float(v[1])] for k, v in ideal_dict.items()}
+# --- Feature extraction: build_feature_row uses constants from exercise_logic ---
 
 def build_feature_row(ex_type: str, landmarks_json: list) -> np.ndarray:
     """
@@ -294,15 +201,14 @@ def build_feature_row(ex_type: str, landmarks_json: list) -> np.ndarray:
 
     row = []
     mp_pose = get_mp_pose()
-    if mp_pose is None:
-        # Fallback if MediaPipe not available
-        for lm in landmarks_json:
-            row.extend([lm["x"], lm["y"], lm["z"], lm["visibility"]])
-        return np.array(row)
+    if mp_pose is not None:
+        landmark_index = {name: mp_pose.PoseLandmark[name].value for name in important}
+    else:
+        landmark_index = {name: POSE_LANDMARK_INDEX[name] for name in important if name in POSE_LANDMARK_INDEX}
     
     for name in important:
-        idx = mp_pose.PoseLandmark[name].value
-        if idx >= len(landmarks_json):
+        idx = landmark_index.get(name)
+        if idx is None or idx >= len(landmarks_json):
             row.extend([0.5, 0.5, 0.0, 0.5])
             continue
         lm = landmarks_json[idx]
@@ -332,12 +238,16 @@ def validate_bicep_curl_pose(landmarks_json: list) -> tuple:
     MAX_SHOULDER_WRIST_Y_DIFF = 0.05
     
     mp_pose = get_mp_pose()
-    if mp_pose is None:
-        return False, "MediaPipe not available. Please check installation.", None
-    
-    def get_landmark(name: str):
-        idx = mp_pose.PoseLandmark[name].value
-        return landmarks_json[idx]
+    if mp_pose is not None:
+        def get_landmark(name: str):
+            idx = mp_pose.PoseLandmark[name].value
+            return landmarks_json[idx]
+    else:
+        def get_landmark(name: str):
+            idx = POSE_LANDMARK_INDEX.get(name)
+            if idx is None or idx >= len(landmarks_json):
+                return None
+            return landmarks_json[idx]
     
     # Check both arms, use the one with better visibility/angle
     arms_to_check = [
@@ -353,17 +263,21 @@ def validate_bicep_curl_pose(landmarks_json: list) -> tuple:
         shoulder = get_landmark(f"{side_upper}_SHOULDER")
         elbow = get_landmark(f"{side_upper}_ELBOW")
         wrist = get_landmark(f"{side_upper}_WRIST")
-        
+        if shoulder is None or elbow is None or wrist is None:
+            continue
+        # Handle dict or object landmarks
+        def _vis(lm): return lm.get("visibility", 0.5) if isinstance(lm, dict) else getattr(lm, "visibility", 0.5)
+        def _xy(lm): return (lm.get("x", 0.5), lm.get("y", 0.5)) if isinstance(lm, dict) else (getattr(lm, "x", 0.5), getattr(lm, "y", 0.5))
         # Check visibility
-        if (shoulder["visibility"] < VISIBILITY_THRESHOLD or
-            elbow["visibility"] < VISIBILITY_THRESHOLD or
-            wrist["visibility"] < VISIBILITY_THRESHOLD):
+        if (_vis(shoulder) < VISIBILITY_THRESHOLD or
+            _vis(elbow) < VISIBILITY_THRESHOLD or
+            _vis(wrist) < VISIBILITY_THRESHOLD):
             continue
         
         # Calculate elbow angle (shoulder-elbow-wrist)
-        shoulder_pt = [shoulder["x"], shoulder["y"]]
-        elbow_pt = [elbow["x"], elbow["y"]]
-        wrist_pt = [wrist["x"], wrist["y"]]
+        shoulder_pt = [float(_xy(shoulder)[0]), float(_xy(shoulder)[1])]
+        elbow_pt = [float(_xy(elbow)[0]), float(_xy(elbow)[1])]
+        wrist_pt = [float(_xy(wrist)[0]), float(_xy(wrist)[1])]
         
         try:
             angle = calculate_angle(shoulder_pt, elbow_pt, wrist_pt)
@@ -384,8 +298,12 @@ def validate_bicep_curl_pose(landmarks_json: list) -> tuple:
     # 1) Wrist should be roughly at or below the shoulder (in image coords y grows downward)
     #    This rejects overhead hand‑raise poses.
     # 2) Arm angle must be within curling range.
-    shoulder_y = get_landmark(f"{best_arm_side.upper()}_SHOULDER")["y"]
-    wrist_y = get_landmark(f"{best_arm_side.upper()}_WRIST")["y"]
+    _sh = get_landmark(f"{best_arm_side.upper()}_SHOULDER")
+    _wr = get_landmark(f"{best_arm_side.upper()}_WRIST")
+    if _sh is None or _wr is None:
+        return True, None, best_angle
+    shoulder_y = _sh.get("y", 0.5) if isinstance(_sh, dict) else getattr(_sh, "y", 0.5)
+    wrist_y = _wr.get("y", 0.5) if isinstance(_wr, dict) else getattr(_wr, "y", 0.5)
 
     if wrist_y < shoulder_y - MAX_SHOULDER_WRIST_Y_DIFF:
         # Wrist clearly above shoulder → looks like a hand raise, not curl
@@ -406,8 +324,6 @@ def validate_torso_upright(landmarks_json: list) -> tuple:
     Returns (is_valid, coaching_message)
     """
     mp_pose_enum = get_mp_pose()
-    if mp_pose_enum is None:
-        return True, None
     if not landmarks_json or len(landmarks_json) < 33:
         return True, None
 
@@ -415,11 +331,18 @@ def validate_torso_upright(landmarks_json: list) -> tuple:
 
     VIS = 0.5
 
-    def get_lm(name):
-        i = mp_pose_enum.PoseLandmark[name].value
-        if i >= len(landmarks_json):
-            return None
-        return landmarks_json[i]
+    if mp_pose_enum is not None:
+        def get_lm(name):
+            i = mp_pose_enum.PoseLandmark[name].value
+            if i >= len(landmarks_json):
+                return None
+            return landmarks_json[i]
+    else:
+        def get_lm(name):
+            i = POSE_LANDMARK_INDEX.get(name)
+            if i is None or i >= len(landmarks_json):
+                return None
+            return landmarks_json[i]
 
     ls = get_lm("LEFT_SHOULDER")
     rs = get_lm("RIGHT_SHOULDER")
@@ -490,19 +413,28 @@ def validate_plank_pose(landmarks_json: list) -> tuple:
     if not landmarks_json or len(landmarks_json) < 33:
         return False, "Show your full body in the frame."
     mp_pose_enum = get_mp_pose()
-    if mp_pose_enum is None:
-        return True, None
-
-    def get_y(name):
-        i = mp_pose_enum.PoseLandmark[name].value
-        if i >= len(landmarks_json):
-            return 0.5
-        lm = landmarks_json[i]
-        if lm is None:
-            return 0.5
-        if isinstance(lm, dict):
-            return lm.get("y", 0.5)
-        return getattr(lm, "y", 0.5)
+    if mp_pose_enum is not None:
+        def get_y(name):
+            i = mp_pose_enum.PoseLandmark[name].value
+            if i >= len(landmarks_json):
+                return 0.5
+            lm = landmarks_json[i]
+            if lm is None:
+                return 0.5
+            if isinstance(lm, dict):
+                return lm.get("y", 0.5)
+            return getattr(lm, "y", 0.5)
+    else:
+        def get_y(name):
+            i = POSE_LANDMARK_INDEX.get(name)
+            if i is None or i >= len(landmarks_json):
+                return 0.5
+            lm = landmarks_json[i]
+            if lm is None:
+                return 0.5
+            if isinstance(lm, dict):
+                return lm.get("y", 0.5)
+            return getattr(lm, "y", 0.5)
 
     shoulder_y = (get_y("LEFT_SHOULDER") + get_y("RIGHT_SHOULDER")) / 2
     hip_y = (get_y("LEFT_HIP") + get_y("RIGHT_HIP")) / 2
@@ -519,19 +451,28 @@ def validate_push_up_pose(landmarks_json: list) -> tuple:
     if not landmarks_json or len(landmarks_json) < 33:
         return False, "Show your full body in the frame."
     mp_pose_enum = get_mp_pose()
-    if mp_pose_enum is None:
-        return True, None
-
-    def get_y(name):
-        i = mp_pose_enum.PoseLandmark[name].value
-        if i >= len(landmarks_json):
-            return 0.5
-        lm = landmarks_json[i]
-        if lm is None:
-            return 0.5
-        if isinstance(lm, dict):
-            return lm.get("y", 0.5)
-        return getattr(lm, "y", 0.5)
+    if mp_pose_enum is not None:
+        def get_y(name):
+            i = mp_pose_enum.PoseLandmark[name].value
+            if i >= len(landmarks_json):
+                return 0.5
+            lm = landmarks_json[i]
+            if lm is None:
+                return 0.5
+            if isinstance(lm, dict):
+                return lm.get("y", 0.5)
+            return getattr(lm, "y", 0.5)
+    else:
+        def get_y(name):
+            i = POSE_LANDMARK_INDEX.get(name)
+            if i is None or i >= len(landmarks_json):
+                return 0.5
+            lm = landmarks_json[i]
+            if lm is None:
+                return 0.5
+            if isinstance(lm, dict):
+                return lm.get("y", 0.5)
+            return getattr(lm, "y", 0.5)
 
     shoulder_y = (get_y("LEFT_SHOULDER") + get_y("RIGHT_SHOULDER")) / 2
     hip_y = (get_y("LEFT_HIP") + get_y("RIGHT_HIP")) / 2
@@ -614,7 +555,7 @@ def _bicep_realtime_update(landmarks_json: list, side: str, state: dict):
     """
     calculate_angle = get_calculate_angle()
     mp_pose = get_mp_pose()
-    if calculate_angle is None or mp_pose is None:
+    if calculate_angle is None:
         return {"visible": False}
 
     SIDE = side.upper()
@@ -624,20 +565,35 @@ def _bicep_realtime_update(landmarks_json: list, side: str, state: dict):
     PEAK_CONTRACTION_THRESHOLD = 60
     LOOSE_UPPER_ARM_ANGLE_THRESHOLD = 55  # was 40, too strict for natural curl
 
-    shoulder = landmarks_json[mp_pose.PoseLandmark[f"{SIDE}_SHOULDER"].value]
-    elbow = landmarks_json[mp_pose.PoseLandmark[f"{SIDE}_ELBOW"].value]
-    wrist = landmarks_json[mp_pose.PoseLandmark[f"{SIDE}_WRIST"].value]
+    if mp_pose is not None:
+        shoulder = landmarks_json[mp_pose.PoseLandmark[f"{SIDE}_SHOULDER"].value]
+        elbow = landmarks_json[mp_pose.PoseLandmark[f"{SIDE}_ELBOW"].value]
+        wrist = landmarks_json[mp_pose.PoseLandmark[f"{SIDE}_WRIST"].value]
+    else:
+        def _lm(name):
+            idx = POSE_LANDMARK_INDEX.get(name)
+            if idx is None or idx >= len(landmarks_json):
+                return None
+            return landmarks_json[idx]
+        shoulder = _lm(f"{SIDE}_SHOULDER")
+        elbow = _lm(f"{SIDE}_ELBOW")
+        wrist = _lm(f"{SIDE}_WRIST")
 
-    if (
-        shoulder.get("visibility", 0) < VIS
-        or elbow.get("visibility", 0) < VIS
-        or wrist.get("visibility", 0) < VIS
-    ):
+    if shoulder is None or elbow is None or wrist is None:
+        return {"visible": False}
+    if isinstance(shoulder, dict):
+        def _vis(lm): return lm.get("visibility", 0)
+        def _xy(lm): return (lm["x"], lm["y"])
+    else:
+        def _vis(lm): return getattr(lm, "visibility", 0)
+        def _xy(lm): return (getattr(lm, "x", 0.5), getattr(lm, "y", 0.5))
+
+    if (_vis(shoulder) < VIS or _vis(elbow) < VIS or _vis(wrist) < VIS):
         return {"visible": False}
 
-    shoulder_pt = [shoulder["x"], shoulder["y"]]
-    elbow_pt = [elbow["x"], elbow["y"]]
-    wrist_pt = [wrist["x"], wrist["y"]]
+    shoulder_pt = [float(_xy(shoulder)[0]), float(_xy(shoulder)[1])]
+    elbow_pt = [float(_xy(elbow)[0]), float(_xy(elbow)[1])]
+    wrist_pt = [float(_xy(wrist)[0]), float(_xy(wrist)[1])]
 
     # Curl angle (for stage/counter)
     # One rep = full circle: down -> up -> down (count when we return to down)
@@ -655,20 +611,29 @@ def _bicep_realtime_update(landmarks_json: list, side: str, state: dict):
     # Check elbow swing using hip as anchor (stable through full curl range)
     # Compare horizontal distance between elbow and shoulder vs shoulder-to-hip distance
     # If elbow drifts far forward/backward from shoulder line, it is swinging
-    mp_pose_local = get_mp_pose()
     loose_upper_arm = False
-    if mp_pose_local:
+    if mp_pose is not None:
         try:
-            hip = landmarks_json[mp_pose_local.PoseLandmark[f"{SIDE}_HIP"].value]
+            hip = landmarks_json[mp_pose.PoseLandmark[f"{SIDE}_HIP"].value]
             hip_pt = [hip["x"], hip["y"]]
-            # Horizontal drift of elbow from shoulder (normalized by shoulder-hip distance)
             shoulder_hip_dist = max(abs(shoulder_pt[1] - hip_pt[1]), 0.05)
             elbow_horizontal_drift = abs(elbow_pt[0] - shoulder_pt[0])
             drift_ratio = elbow_horizontal_drift / shoulder_hip_dist
-            # If elbow drifts more than 45% of shoulder-hip distance horizontally, it is swinging
             loose_upper_arm = drift_ratio > 0.45
         except Exception:
             loose_upper_arm = False
+    else:
+        hip_idx = POSE_LANDMARK_INDEX.get(f"{SIDE}_HIP")
+        if hip_idx is not None and hip_idx < len(landmarks_json):
+            hip = landmarks_json[hip_idx]
+            if hip is not None:
+                hx = hip.get("x", 0.5) if isinstance(hip, dict) else getattr(hip, "x", 0.5)
+                hy = hip.get("y", 0.5) if isinstance(hip, dict) else getattr(hip, "y", 0.5)
+                hip_pt = [float(hx), float(hy)]
+                shoulder_hip_dist = max(abs(shoulder_pt[1] - hip_pt[1]), 0.05)
+                elbow_horizontal_drift = abs(elbow_pt[0] - shoulder_pt[0])
+                drift_ratio = elbow_horizontal_drift / shoulder_hip_dist
+                loose_upper_arm = drift_ratio > 0.45
     state["loose_upper_arm"] = loose_upper_arm
 
     # Peak contraction tracking (detect weak peak when coming back down)
@@ -763,8 +728,22 @@ def _squat_analyze_foot_knee_from_json(landmarks_json: list, stage: str):
       knee_placement: -1 unknown, 0 correct, 1 too tight, 2 too wide
     """
     mp_pose = get_mp_pose()
-    if mp_pose is None:
-        return {"foot_placement": -1, "knee_placement": -1}
+    if mp_pose is not None:
+        def lm(name: str):
+            return landmarks_json[mp_pose.PoseLandmark[name].value]
+    else:
+        def lm(name: str):
+            idx = POSE_LANDMARK_INDEX.get(name)
+            if idx is None or idx >= len(landmarks_json):
+                return {"visibility": 0.0, "x": 0.5, "y": 0.5}
+            p = landmarks_json[idx]
+            if p is None:
+                return {"visibility": 0.0, "x": 0.5, "y": 0.5}
+            if isinstance(p, dict):
+                return p
+            return {"x": getattr(p, "x", 0.5), "y": getattr(p, "y", 0.5), "visibility": getattr(p, "visibility", 0.0)}
+
+    analyzed = {"foot_placement": -1, "knee_placement": -1}
 
     VISIBILITY_THRESHOLD = 0.6
     FOOT_SHOULDER_RATIO_THRESHOLDS = (1.2, 2.8)
@@ -773,11 +752,6 @@ def _squat_analyze_foot_knee_from_json(landmarks_json: list, stage: str):
         "middle": (0.7, 1.0),
         "down": (0.7, 1.1),
     }
-
-    def lm(name: str):
-        return landmarks_json[mp_pose.PoseLandmark[name].value]
-
-    analyzed = {"foot_placement": -1, "knee_placement": -1}
 
     lf = lm("LEFT_FOOT_INDEX")
     rf = lm("RIGHT_FOOT_INDEX")
@@ -835,22 +809,34 @@ def _squat_is_started(landmarks_json: list):
     """
     calculate_angle = get_calculate_angle()
     mp_pose = get_mp_pose()
-    if calculate_angle is None or mp_pose is None:
+    if calculate_angle is None:
         return True, {"fallback": "no_tools"}
 
     # Use default values for missing landmarks (like tree_pose does)
     _def = {"x": 0.5, "y": 0.5, "visibility": 0.0}
 
-    def lm(name: str):
-        i = mp_pose.PoseLandmark[name].value
-        if i >= len(landmarks_json):
-            return _def.copy()
-        p = landmarks_json[i]
-        if p is None:
-            return _def.copy()
-        if isinstance(p, dict):
-            return {"x": p.get("x", 0.5), "y": p.get("y", 0.5), "visibility": p.get("visibility", 0.0)}
-        return {"x": getattr(p, "x", 0.5), "y": getattr(p, "y", 0.5), "visibility": getattr(p, "visibility", 0.0)}
+    if mp_pose is not None:
+        def lm(name: str):
+            i = mp_pose.PoseLandmark[name].value
+            if i >= len(landmarks_json):
+                return _def.copy()
+            p = landmarks_json[i]
+            if p is None:
+                return _def.copy()
+            if isinstance(p, dict):
+                return {"x": p.get("x", 0.5), "y": p.get("y", 0.5), "visibility": p.get("visibility", 0.0)}
+            return {"x": getattr(p, "x", 0.5), "y": getattr(p, "y", 0.5), "visibility": getattr(p, "visibility", 0.0)}
+    else:
+        def lm(name: str):
+            i = POSE_LANDMARK_INDEX.get(name)
+            if i is None or i >= len(landmarks_json):
+                return _def.copy()
+            p = landmarks_json[i]
+            if p is None:
+                return _def.copy()
+            if isinstance(p, dict):
+                return {"x": p.get("x", 0.5), "y": p.get("y", 0.5), "visibility": p.get("visibility", 0.0)}
+            return {"x": getattr(p, "x", 0.5), "y": getattr(p, "y", 0.5), "visibility": getattr(p, "visibility", 0.0)}
 
     # Get landmarks - even if visibility is low, we'll use the x/y positions
     left = {
@@ -1106,29 +1092,72 @@ def stream_process(request):
                     {"message": f"Model {ex_type} not found", "accuracy": 0, "posture_ok": False}
                 )
 
-            # Build plank input exactly like detection/plank.py; always run model so user sees continuous accuracy
+            # Build plank input exactly like detection/plank.py; always run model so user sees continuous accuracy.
+            # Use numpy arrays only so we don't depend on pandas in the runtime environment.
+            input_row = build_feature_row("plank", landmarks)
+            X_df = np.array([input_row])
             try:
-                import pandas as pd
-                input_row = build_feature_row("plank", landmarks)
-                cols = []
-                for lm_name in PLANK_IMPORTANT_LANDMARKS:
-                    cols += [
-                        f"{lm_name.lower()}_x", f"{lm_name.lower()}_y",
-                        f"{lm_name.lower()}_z", f"{lm_name.lower()}_v",
-                    ]
-                X_df = pd.DataFrame([input_row], columns=cols)
                 if current["scaler"]:
-                    X_scaled = current["scaler"].transform(X_df)
-                    X_df = pd.DataFrame(X_scaled)
+                    X_df = current["scaler"].transform(X_df)
+                prediction = current["model"].predict(X_df)[0]
+                probs = current["model"].predict_proba(X_df)[0]
             except Exception as e:
-                return Response({
-                    "message": "Plank: Processing error.",
-                    "accuracy": 0,
-                    "posture_ok": False,
-                })
+                # If ML isn't available (env mismatch), fall back to geometric + ideal-pose accuracy.
+                print(f"Plank model error: {e}")
+                ideal_dict = IDEAL_POSES.get("plank", {}).get("hold")
+                ideal_landmarks = _ideal_landmarks_for_response(ideal_dict) if ideal_dict else None
 
-            prediction = current["model"].predict(X_df)[0]
-            probs = current["model"].predict_proba(X_df)[0]
+                def _get_y(idx, default=0.5):
+                    if idx >= len(landmarks):
+                        return default
+                    lm = landmarks[idx]
+                    if lm is None:
+                        return default
+                    if isinstance(lm, dict):
+                        return float(lm.get("y", default))
+                    return float(getattr(lm, "y", default))
+
+                shoulder_y = (_get_y(11) + _get_y(12)) / 2
+                hip_y = (_get_y(23) + _get_y(24)) / 2
+                # Hips too low => hip is significantly below shoulders (y much larger)
+                if hip_y - shoulder_y > 0.12:
+                    coaching_msg = "Hips too low. Raise your hips to align with your shoulders."
+                    posture_ok = False
+                # Hips too high => hip is significantly above shoulders (y smaller)
+                elif hip_y - shoulder_y < -0.12:
+                    coaching_msg = "Hips too high. Lower your hips to form a straight line."
+                    posture_ok = False
+                else:
+                    coaching_msg = "Perfect plank. Body is straight. Keep holding."
+                    posture_ok = True
+
+                if gate_failed:
+                    return Response(
+                        {
+                            "message": f"Plank: {gate_msg}",
+                            "accuracy": 0,
+                            "posture_ok": False,
+                        }
+                    )
+
+                try:
+                    acc = int(round(_accuracy_vs_ideal(landmarks, ideal_dict))) if ideal_dict else 0
+                except Exception:
+                    acc = 0
+                if posture_ok and acc < 95:
+                    acc = 95
+                if not posture_ok:
+                    acc = min(99, acc) if acc else 70
+
+                return Response(
+                    {
+                        "message": f"Plank: {coaching_msg}",
+                        "accuracy": max(0, min(100, acc)),
+                        "posture_ok": posture_ok,
+                        "ideal_landmarks": ideal_landmarks,
+                    }
+                )
+
             max_prob = float(max(probs))
             confidence = int(round(max_prob * 100))
 
@@ -1186,7 +1215,14 @@ def stream_process(request):
             if not s or not s.get("model"):
                 return Response({"message": "Squat: Model not found", "accuracy": 0, "posture_ok": False})
 
-            # Stage prediction (up/down) from model trained on 9 landmarks (repo uses prob threshold)
+            # Stage prediction (up/down) from model trained on 9 landmarks (repo uses prob threshold).
+            # If the model cannot be used (e.g. sklearn version mismatch), we gracefully fall back to
+            # geometric squat analysis only instead of returning an error to the user.
+            pred = "middle"
+            prob = 0.0
+            conf = 0
+            prediction_probability = 0.0
+            model_predicted = False
             try:
                 # The original repo predicts using a pandas DataFrame with a stable column order.
                 # Some sklearn models are sensitive to feature ordering/shapes, so keep it consistent.
@@ -1207,13 +1243,19 @@ def stream_process(request):
                     # Fallback to numpy if pandas isn't available for some reason
                     X_in = np.array([input_row])
 
-                pred = s["model"].predict(X_in)[0]
-                probs = s["model"].predict_proba(X_in)[0]
-                conf = int(max(probs) * 100)
-                prob = float(max(probs))
-                prediction_probability = round(prob, 2)
+                model = s.get("model")
+                if model is not None:
+                    # Some environments may have sklearn versions that cannot unpickle the
+                    # original DecisionTree/ensemble objects cleanly. Wrap in try so we
+                    # can still provide rule-based squat guidance without crashing.
+                    probs = model.predict_proba(X_in)[0]
+                    conf = int(max(probs) * 100)
+                    prob = float(max(probs))
+                    prediction_probability = round(prob, 2)
+                    pred = model.predict(X_in)[0]
+                    model_predicted = True
             except Exception as e:
-                return Response({"message": f"Squat: AI Processing Error ({e})", "accuracy": 0, "posture_ok": False})
+                print(f"Squat model error: {e}")
 
             # Require reasonable confidence before we treat stage changes as real
             PREDICTION_PROB_THRESHOLD = 0.7
@@ -1221,6 +1263,49 @@ def stream_process(request):
             client_key = _get_client_key(request)
             _ensure_squat_state(client_key)
             st = _SQUAT_RT_STATE[client_key]
+
+            # If ML isn't usable, derive "up/down" stage from knee angles so squat still works.
+            if not model_predicted:
+                calculate_angle = get_calculate_angle()
+                if calculate_angle is not None:
+                    def _get(idx, key, default=0.5):
+                        if idx >= len(landmarks):
+                            return default
+                        lm = landmarks[idx]
+                        if lm is None:
+                            return default
+                        if isinstance(lm, dict):
+                            return lm.get(key, default)
+                        return getattr(lm, key, default)
+
+                    # Left knee angle: hip-knee-ankle
+                    lh = [_get(23, "x"), _get(23, "y")]
+                    lk = [_get(25, "x"), _get(25, "y")]
+                    la = [_get(27, "x"), _get(27, "y")]
+                    rh = [_get(24, "x"), _get(24, "y")]
+                    rk = [_get(26, "x"), _get(26, "y")]
+                    ra = [_get(28, "x"), _get(28, "y")]
+                    try:
+                        left_knee = float(calculate_angle(lh, lk, la))
+                        right_knee = float(calculate_angle(rh, rk, ra))
+                        knee = min(left_knee, right_knee)
+                    except Exception:
+                        knee = 180.0
+
+                    # Heuristic stage from knee bend
+                    if knee < 125:
+                        pred = "down"
+                        prob = 0.95
+                        conf = 95
+                    elif knee > 160:
+                        pred = "up"
+                        prob = 0.95
+                        conf = 95
+                    else:
+                        pred = st.get("current_stage") or "middle"
+                        prob = 0.75
+                        conf = 75
+                    prediction_probability = round(float(prob), 2)
 
             # Gate: require a few consecutive frames showing real squat movement.
             started, _dbg = _squat_is_started(landmarks)
@@ -1404,17 +1489,110 @@ def stream_process(request):
         if ex_type == "lunge":
             models = get_models()
 
-            l_data = models["lunge"]
-            if l_data["scaler"]:
-                X = l_data["scaler"].transform(X)
+            l_data = models.get("lunge") or {}
+            stage_model = l_data.get("stage_model")
+            err_model = l_data.get("err_model")
+            scaler = l_data.get("scaler")
 
-            stage = l_data["stage_model"].predict(X)[0]
-            stage_probs = l_data["stage_model"].predict_proba(X)[0]
-            stage_conf = max(stage_probs)
+            if not stage_model or not err_model:
+                # Fall back to a simple rule-based lunge check if ML models aren't available.
+                calculate_angle = get_calculate_angle()
+                if calculate_angle is None:
+                    return Response({"message": "Lunge: Pose analysis not available.", "accuracy": 0, "posture_ok": False})
 
-            err = l_data["err_model"].predict(X)[0]
-            err_probs = l_data["err_model"].predict_proba(X)[0]
-            err_conf = max(err_probs)
+                def _get(idx, key, default=0.5):
+                    if idx >= len(landmarks):
+                        return default
+                    lm = landmarks[idx]
+                    if lm is None:
+                        return default
+                    if isinstance(lm, dict):
+                        return lm.get(key, default)
+                    return getattr(lm, key, default)
+
+                # Compute knee angles and pick the more bent leg as the "front" leg.
+                l_hip = [_get(23, "x"), _get(23, "y")]
+                l_knee = [_get(25, "x"), _get(25, "y")]
+                l_ankle = [_get(27, "x"), _get(27, "y")]
+                r_hip = [_get(24, "x"), _get(24, "y")]
+                r_knee = [_get(26, "x"), _get(26, "y")]
+                r_ankle = [_get(28, "x"), _get(28, "y")]
+                try:
+                    l_knee_ang = float(calculate_angle(l_hip, l_knee, l_ankle))
+                    r_knee_ang = float(calculate_angle(r_hip, r_knee, r_ankle))
+                except Exception:
+                    l_knee_ang, r_knee_ang = 180.0, 180.0
+
+                if l_knee_ang <= r_knee_ang:
+                    front = ("left", l_hip, l_knee, l_ankle, l_knee_ang)
+                else:
+                    front = ("right", r_hip, r_knee, r_ankle, r_knee_ang)
+
+                side, hip_pt, knee_pt, ankle_pt, knee_ang = front
+                stage = "down" if knee_ang < 125 else "up"
+
+                # Knee tracking: knee should be roughly over ankle (x alignment)
+                knee_x = float(knee_pt[0])
+                ankle_x = float(ankle_pt[0])
+                align_err = abs(knee_x - ankle_x)
+                if align_err > 0.07:
+                    msg = "Lunge: Keep your front knee tracking over your toes (don’t let it cave in)."
+                    return Response({"message": msg, "accuracy": 60, "posture_ok": False, "stage": stage})
+
+                if stage == "down":
+                    msg = "Lunge: Good depth. Push through the front heel to return up."
+                    return Response({"message": msg, "accuracy": 90, "posture_ok": True, "stage": stage})
+                msg = "Lunge: Step forward and lower until your front knee is about 90°."
+                return Response({"message": msg, "accuracy": 75, "posture_ok": False, "stage": stage})
+
+            X_in = X
+            if scaler is not None:
+                try:
+                    X_in = scaler.transform(X)
+                except Exception as e:
+                    print(f"Lunge scaler transform error: {e}")
+
+            try:
+                stage = stage_model.predict(X_in)[0]
+                stage_probs = stage_model.predict_proba(X_in)[0]
+                stage_conf = max(stage_probs)
+
+                err = err_model.predict(X_in)[0]
+                err_probs = err_model.predict_proba(X_in)[0]
+                err_conf = max(err_probs)
+            except Exception as e:
+                print(f"Lunge model error: {e}")
+                # Fall back to rule-based lunge instead of surfacing a hard error.
+                calculate_angle = get_calculate_angle()
+                if calculate_angle is None:
+                    return Response({"message": "Lunge: Processing error.", "accuracy": 0, "posture_ok": False})
+
+                def _get(idx, key, default=0.5):
+                    if idx >= len(landmarks):
+                        return default
+                    lm = landmarks[idx]
+                    if lm is None:
+                        return default
+                    if isinstance(lm, dict):
+                        return lm.get(key, default)
+                    return getattr(lm, key, default)
+
+                l_hip = [_get(23, "x"), _get(23, "y")]
+                l_knee = [_get(25, "x"), _get(25, "y")]
+                l_ankle = [_get(27, "x"), _get(27, "y")]
+                r_hip = [_get(24, "x"), _get(24, "y")]
+                r_knee = [_get(26, "x"), _get(26, "y")]
+                r_ankle = [_get(28, "x"), _get(28, "y")]
+                try:
+                    l_knee_ang = float(calculate_angle(l_hip, l_knee, l_ankle))
+                    r_knee_ang = float(calculate_angle(r_hip, r_knee, r_ankle))
+                except Exception:
+                    l_knee_ang, r_knee_ang = 180.0, 180.0
+                knee_ang = min(l_knee_ang, r_knee_ang)
+                stage = "down" if knee_ang < 125 else "up"
+                msg = "Lunge: Keep your torso upright and lower until your front knee is about 90°."
+                acc = 80 if stage == "down" else 70
+                return Response({"message": msg, "accuracy": acc, "posture_ok": False, "stage": stage})
 
             # Example mapping; adjust to your label set
             err_map = {
@@ -1784,8 +1962,7 @@ def stream_process(request):
                 })
 
             calculate_angle = get_calculate_angle()
-            mp_pose = get_mp_pose()
-            if calculate_angle is None or mp_pose is None:
+            if calculate_angle is None:
                 return Response({
                     "message": "Push-up: Pose analysis not available.",
                     "accuracy": 0,
@@ -2211,10 +2388,10 @@ def stream_process(request):
 
             mp_pose = get_mp_pose()
             calculate_angle = get_calculate_angle()
-            if mp_pose is None or calculate_angle is None:
+            if calculate_angle is None:
                 return Response(
                     {
-                        "message": "Tree Pose: Pose analysis not available (MediaPipe/angles missing).",
+                        "message": "Tree Pose: Pose analysis not available (angles missing).",
                         "accuracy": 0,
                         "posture_ok": False,
                     }
@@ -2224,16 +2401,28 @@ def stream_process(request):
 
             _def = {"x": 0.5, "y": 0.5, "visibility": 0.0}
 
-            def lm(name: str):
-                i = mp_pose.PoseLandmark[name].value
-                if i >= len(landmarks):
-                    return _def.copy()
-                p = landmarks[i]
-                if p is None:
-                    return _def.copy()
-                if isinstance(p, dict):
-                    return {"x": p.get("x", 0.5), "y": p.get("y", 0.5), "visibility": p.get("visibility", 0.0)}
-                return {"x": getattr(p, "x", 0.5), "y": getattr(p, "y", 0.5), "visibility": getattr(p, "visibility", 0.0)}
+            if mp_pose is not None:
+                def lm(name: str):
+                    i = mp_pose.PoseLandmark[name].value
+                    if i >= len(landmarks):
+                        return _def.copy()
+                    p = landmarks[i]
+                    if p is None:
+                        return _def.copy()
+                    if isinstance(p, dict):
+                        return {"x": p.get("x", 0.5), "y": p.get("y", 0.5), "visibility": p.get("visibility", 0.0)}
+                    return {"x": getattr(p, "x", 0.5), "y": getattr(p, "y", 0.5), "visibility": getattr(p, "visibility", 0.0)}
+            else:
+                def lm(name: str):
+                    i = POSE_LANDMARK_INDEX.get(name)
+                    if i is None or i >= len(landmarks):
+                        return _def.copy()
+                    p = landmarks[i]
+                    if p is None:
+                        return _def.copy()
+                    if isinstance(p, dict):
+                        return {"x": p.get("x", 0.5), "y": p.get("y", 0.5), "visibility": p.get("visibility", 0.0)}
+                    return {"x": getattr(p, "x", 0.5), "y": getattr(p, "y", 0.5), "visibility": getattr(p, "visibility", 0.0)}
 
             left_ankle = lm("LEFT_ANKLE")
             right_ankle = lm("RIGHT_ANKLE")
@@ -2573,8 +2762,8 @@ def signup(request):
             email         = data["email"],
             password_hash = make_password(data["password"]),
             age           = data.get("age") or None,
-            height_cm     = data.get("height") or None,
-            weight_kg     = data.get("weight") or None,
+            height        = data.get("height") or None,
+            weight        = data.get("weight") or None,
         )
         print(f"New user created: {user.email}")
         return JsonResponse({"success": True, "user_id": user.id,

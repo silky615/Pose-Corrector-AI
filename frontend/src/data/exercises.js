@@ -1,6 +1,5 @@
 // Shared exercise list. Images in public folder (paths from root).
 const publicUrl = process.env.PUBLIC_URL || "";
-const PLACEHOLDER = (text) => `https://placehold.co/600x400?text=${encodeURIComponent(text)}`;
 export const EXERCISES = [
   {
     id: "tree-pose",

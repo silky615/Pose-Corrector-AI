@@ -404,10 +404,33 @@
   overflow: hidden;
   background: #000;
   aspect-ratio: 4/3;
+  border: 3px solid transparent;
+  transition: border-color 0.25s ease;
+}
+.exercise-video-container.posture-correct {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.3);
+}
+.exercise-video-container.posture-incorrect {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3);
+}
+.exercise-video-container {
+  position: relative;
 }
 .exercise-video {
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.exercise-pose-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
   object-fit: cover;
 }
 .exercise-analyzing {
@@ -445,6 +468,27 @@
 .muted.small { font-size: 13px; margin: 0; }
 .hidden { display: none !important; }
 .exercise-upload-success { color: var(--accent-2); font-weight: 500; margin: 0; }
+
+/* Live feedback: green = correct pose, red = incorrect */
+.exercise-feedback {
+  width: 100%;
+  max-width: 560px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border-left: 4px solid rgba(255,255,255,0.15);
+  transition: border-color 0.25s ease, background 0.25s ease;
+}
+.exercise-feedback.posture-correct {
+  border-left-color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+}
+.exercise-feedback.posture-incorrect {
+  border-left-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+.exercise-feedback-message { margin: 0 0 6px 0; font-weight: 500; }
+.exercise-feedback-accuracy,
+.exercise-feedback-counter { margin: 0; font-size: 14px; color: var(--muted); }
 
 /* Responsive */
 @media (max-width:760px){
