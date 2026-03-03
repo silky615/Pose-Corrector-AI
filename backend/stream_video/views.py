@@ -158,6 +158,16 @@ def get_models():
                 "err_model": load_machine_learning_model("lunge_err_model.pkl"),
                 "scaler": load_machine_learning_model("lunge_input_scaler.pkl"),
             },
+            # Tree Pose ML model
+            "tree_pose": {
+                "model":  load_machine_learning_model("tree_pose_model.pkl"),
+                "scaler": load_machine_learning_model("tree_pose_input_scaler.pkl"),
+            },
+            # Push Up ML model
+            "push_up": {
+                "model":  load_machine_learning_model("push_up_model.pkl"),
+                "scaler": load_machine_learning_model("push_up_input_scaler.pkl"),
+            },
         }
         _models_loaded = True
         print("AI Server: All models ready.")
@@ -317,85 +327,81 @@ def build_feature_row(ex_type: str, landmarks_json: list) -> np.ndarray:
     return np.array(row)
 
 def validate_bicep_curl_pose(landmarks_json: list) -> tuple:
+    """
+    Validate that the user is actually performing a bicep curl.
+    Returns (is_valid, coaching_message, best_arm_angle)
+    """
     calculate_angle = get_calculate_angle()
     if calculate_angle is None:
         return False, "Angle calculation not available.", None
-    """
-    Validate that the user is actually performing a bicep curl by checking:
-    1. Key joints are visible
-    2. Arm is bent (elbow angle is in curling range)
-    3. Returns (is_valid, coaching_message, best_arm_angle)
-    """
+
     VISIBILITY_THRESHOLD = 0.6
-    # Only reject wrist clearly above shoulder (hand raise rejection)
-    # Full curl goes ~160 deg (arm down) to ~30 deg (fully curled) — never block by angle
-    MAX_SHOULDER_WRIST_Y_DIFF = 0.05
-    
+    MAX_SHOULDER_WRIST_Y_DIFF = 0.05  # reject hand raise
+    MAX_ARM_HORIZONTAL_SPREAD = 0.18  # reject lateral raise (stricter)
+
     mp_pose = get_mp_pose()
     if mp_pose is None:
         return False, "MediaPipe not available. Please check installation.", None
-    
+
     def get_landmark(name: str):
         idx = mp_pose.PoseLandmark[name].value
         return landmarks_json[idx]
-    
-    # Check both arms, use the one with better visibility/angle
-    arms_to_check = [
-        ("LEFT", "left"),
-        ("RIGHT", "right"),
-    ]
-    
+
+    arms_to_check = [("LEFT", "left"), ("RIGHT", "right")]
+
     best_angle = None
     best_arm_side = None
     best_visible = False
-    
+
     for side_upper, side_lower in arms_to_check:
         shoulder = get_landmark(f"{side_upper}_SHOULDER")
         elbow = get_landmark(f"{side_upper}_ELBOW")
         wrist = get_landmark(f"{side_upper}_WRIST")
-        
-        # Check visibility
+
         if (shoulder["visibility"] < VISIBILITY_THRESHOLD or
             elbow["visibility"] < VISIBILITY_THRESHOLD or
             wrist["visibility"] < VISIBILITY_THRESHOLD):
             continue
-        
-        # Calculate elbow angle (shoulder-elbow-wrist)
+
         shoulder_pt = [shoulder["x"], shoulder["y"]]
         elbow_pt = [elbow["x"], elbow["y"]]
         wrist_pt = [wrist["x"], wrist["y"]]
-        
+
         try:
             angle = calculate_angle(shoulder_pt, elbow_pt, wrist_pt)
-            
-            # Track the best arm (most bent, visible)
             if best_angle is None or angle < best_angle:
                 best_angle = angle
                 best_arm_side = side_lower
                 best_visible = True
         except:
             continue
-    
-    # If no arm is visible, prompt user
+
     if not best_visible or best_angle is None:
         return False, "Position yourself so your arms are fully visible in the camera.", None
-    
-    # Enforce basic bicep‑curl geometry:
-    # 1) Wrist should be roughly at or below the shoulder (in image coords y grows downward)
-    #    This rejects overhead hand‑raise poses.
-    # 2) Arm angle must be within curling range.
-    shoulder_y = get_landmark(f"{best_arm_side.upper()}_SHOULDER")["y"]
-    wrist_y = get_landmark(f"{best_arm_side.upper()}_WRIST")["y"]
 
+    shoulder_y  = get_landmark(f"{best_arm_side.upper()}_SHOULDER")["y"]
+    shoulder_x  = get_landmark(f"{best_arm_side.upper()}_SHOULDER")["x"]
+    elbow_y     = get_landmark(f"{best_arm_side.upper()}_ELBOW")["y"]
+    elbow_x     = get_landmark(f"{best_arm_side.upper()}_ELBOW")["x"]
+    wrist_y     = get_landmark(f"{best_arm_side.upper()}_WRIST")["y"]
+    wrist_x     = get_landmark(f"{best_arm_side.upper()}_WRIST")["x"]
+
+    # Check 1: wrist above shoulder = hand raise
     if wrist_y < shoulder_y - MAX_SHOULDER_WRIST_Y_DIFF:
-        # Wrist clearly above shoulder → looks like a hand raise, not curl
-        return (
-            False,
-            f"Lower your {best_arm_side} hand to the side of your body to start the curl.",
-            best_angle,
-        )
+        return (False, f"Lower your {best_arm_side} hand to the side of your body.", best_angle)
 
-    # Arm is visible and not an overhead raise — valid curl at any angle
+    # Check 2: wrist too far sideways = lateral raise
+    if abs(wrist_x - shoulder_x) > MAX_ARM_HORIZONTAL_SPREAD:
+        return (False, f"Bicep Curl: Keep your arm close to your body, not raised sideways.", best_angle)
+
+    # Check 3: elbow too far sideways = arms stretched out
+    if abs(elbow_x - shoulder_x) > MAX_ARM_HORIZONTAL_SPREAD:
+        return (False, f"Bicep Curl: Keep your elbow tucked at your side.", best_angle)
+
+    # Check 4: elbow above shoulder = arms raised up
+    if elbow_y < shoulder_y - 0.05:
+        return (False, f"Bicep Curl: Lower your elbow — keep it at your side.", best_angle)
+
     return True, None, best_angle
 
 def validate_torso_upright(landmarks_json: list) -> tuple:
@@ -1810,146 +1816,112 @@ def stream_process(request):
 
         # Push-up: body in straight line (plank-like), elbow angle for phase + rep count
         if ex_type == "push_up":
+            # Gate: reject clearly non-push-up positions
             is_push_up_like, gate_msg = validate_push_up_pose(landmarks)
+            client_key = _get_client_key(request)
+            _ensure_push_up_state(client_key)
+            st = _PUSH_UP_RT_STATE[client_key]
+
             if not is_push_up_like:
                 return Response({
                     "message": f"Push-up: {gate_msg}",
                     "accuracy": 0,
                     "posture_ok": False,
-                    "stage": "up",
-                    "counter": 0,
+                    "stage": st["stage"],
+                    "counter": st["counter"],
                 })
 
-            calculate_angle = get_calculate_angle()
-            mp_pose = get_mp_pose()
-            if calculate_angle is None or mp_pose is None:
+            # ML model: 13 landmarks x 4 = 52 features
+            # 0=correct, 1=incorrect
+            PUSH_UP_LANDMARKS = [
+                "NOSE",
+                "LEFT_SHOULDER", "RIGHT_SHOULDER",
+                "LEFT_ELBOW",    "RIGHT_ELBOW",
+                "LEFT_WRIST",    "RIGHT_WRIST",
+                "LEFT_HIP",      "RIGHT_HIP",
+                "LEFT_KNEE",     "RIGHT_KNEE",
+                "LEFT_ANKLE",    "RIGHT_ANKLE",
+            ]
+
+            models = get_models()
+            pu_data = models.get("push_up")
+            if not pu_data or not pu_data["model"]:
+                return Response({
+                    "message": "Push-up: Model not loaded.",
+                    "accuracy": 0, "posture_ok": False,
+                    "stage": st["stage"], "counter": st["counter"],
+                })
+
+            mp_pose_enum = get_mp_pose()
+            if mp_pose_enum is None:
                 return Response({
                     "message": "Push-up: Pose analysis not available.",
-                    "accuracy": 0,
-                    "posture_ok": False,
-                    "stage": "up",
-                    "counter": 0,
+                    "accuracy": 0, "posture_ok": False,
+                    "stage": st["stage"], "counter": st["counter"],
                 })
 
-            def _get_pu(landmarks_list, idx, key, default=0.5):
-                if idx >= len(landmarks_list):
-                    return default
-                lm = landmarks_list[idx]
-                if lm is None:
-                    return default
-                if isinstance(lm, dict):
-                    return lm.get(key, default)
-                return getattr(lm, key, default)
+            try:
+                row = []
+                for lm_name in PUSH_UP_LANDMARKS:
+                    idx = mp_pose_enum.PoseLandmark[lm_name].value
+                    if idx >= len(landmarks):
+                        row.extend([0.5, 0.5, 0.0, 0.5]); continue
+                    lm_i = landmarks[idx]
+                    if lm_i is None:
+                        row.extend([0.5, 0.5, 0.0, 0.5]); continue
+                    if isinstance(lm_i, dict):
+                        row.extend([lm_i.get("x",0.5), lm_i.get("y",0.5), lm_i.get("z",0.0), lm_i.get("visibility",0.5)])
+                    else:
+                        row.extend([getattr(lm_i,"x",0.5), getattr(lm_i,"y",0.5), getattr(lm_i,"z",0.0), getattr(lm_i,"visibility",0.5)])
 
-            # 11=L_SHOULDER, 12=R_SHOULDER, 13=L_ELBOW, 14=R_ELBOW, 15=L_WRIST, 16=R_WRIST
-            # 23=L_HIP, 24=R_HIP, 25=L_KNEE, 26=R_KNEE, 27=L_ANKLE, 28=R_ANKLE
-            ls_x = _get_pu(landmarks, 11, "x")
-            ls_y = _get_pu(landmarks, 11, "y")
-            rs_x = _get_pu(landmarks, 12, "x")
-            rs_y = _get_pu(landmarks, 12, "y")
-            le_x = _get_pu(landmarks, 13, "x")
-            le_y = _get_pu(landmarks, 13, "y")
-            re_x = _get_pu(landmarks, 14, "x")
-            re_y = _get_pu(landmarks, 14, "y")
-            lw_x = _get_pu(landmarks, 15, "x")
-            lw_y = _get_pu(landmarks, 15, "y")
-            rw_x = _get_pu(landmarks, 16, "x")
-            rw_y = _get_pu(landmarks, 16, "y")
-            lh_x = _get_pu(landmarks, 23, "x")
-            lh_y = _get_pu(landmarks, 23, "y")
-            rh_x = _get_pu(landmarks, 24, "x")
-            rh_y = _get_pu(landmarks, 24, "y")
-            lk_x = _get_pu(landmarks, 25, "x")
-            lk_y = _get_pu(landmarks, 25, "y")
-            rk_x = _get_pu(landmarks, 26, "x")
-            rk_y = _get_pu(landmarks, 26, "y")
-            la_x = _get_pu(landmarks, 27, "x")
-            la_y = _get_pu(landmarks, 27, "y")
-            ra_x = _get_pu(landmarks, 28, "x")
-            ra_y = _get_pu(landmarks, 28, "y")
+                X_pu = np.array(row).reshape(1, -1)
+                if pu_data["scaler"]:
+                    X_pu = pu_data["scaler"].transform(X_pu)
 
-            # Elbow angles (shoulder-elbow-wrist) for phase
-            left_elbow_angle = float(calculate_angle([ls_x, ls_y], [le_x, le_y], [lw_x, lw_y]))
-            right_elbow_angle = float(calculate_angle([rs_x, rs_y], [re_x, re_y], [rw_x, rw_y]))
-            # Use the more bent arm (min angle) so we don't count a rep until both arms come up
-            elbow_angle = min(left_elbow_angle, right_elbow_angle)
+                pred  = pu_data["model"].predict(X_pu)[0]
+                proba = pu_data["model"].predict_proba(X_pu)[0]
+                conf  = int(max(proba) * 100)
+                posture_ok = int(pred) == 0  # 0=correct, 1=incorrect
+            except Exception as e:
+                return Response({
+                    "message": f"Push-up: Prediction error — {e}",
+                    "accuracy": 0, "posture_ok": False,
+                    "stage": st["stage"], "counter": st["counter"],
+                })
 
-            # Body line: knee push-up = feet lifted (ankle above knee) → use shoulder-hip-knee; else full push-up → shoulder-hip-ankle
-            shoulder_pt = [(ls_x + rs_x) / 2, (ls_y + rs_y) / 2]
-            hip_pt = [(lh_x + rh_x) / 2, (lh_y + rh_y) / 2]
-            knee_pt = [(lk_x + rk_x) / 2, (lk_y + rk_y) / 2]
-            ankle_pt = [(la_x + ra_x) / 2, (la_y + ra_y) / 2]
-            knee_y_mid = (lk_y + rk_y) / 2
-            ankle_y_mid = (la_y + ra_y) / 2
-            # Knee push-up: feet lifted (ankle higher than knee in image = smaller y)
-            is_knee_pushup = ankle_y_mid < knee_y_mid + 0.08
-            if is_knee_pushup:
-                body_line_angle = float(calculate_angle(shoulder_pt, hip_pt, knee_pt))
-            else:
-                body_line_angle = float(calculate_angle(shoulder_pt, hip_pt, ankle_pt))
-            BODY_LINE_STRICT = 160   # 100% only when really straight
-            BODY_LINE_MIN = 152      # below this = clear sag or pike
-            body_straight = body_line_angle >= BODY_LINE_STRICT
-            body_acceptable = body_line_angle >= BODY_LINE_MIN
+            # Rep counting via elbow angle (geometry, best-effort)
+            calculate_angle = get_calculate_angle()
+            if calculate_angle and mp_pose_enum:
+                try:
+                    def _gpv(i, k, d=0.5):
+                        if i >= len(landmarks): return d
+                        lm_i = landmarks[i]
+                        if lm_i is None: return d
+                        return lm_i.get(k, d) if isinstance(lm_i, dict) else getattr(lm_i, k, d)
+                    la = float(calculate_angle([_gpv(11,"x"),_gpv(11,"y")],[_gpv(13,"x"),_gpv(13,"y")],[_gpv(15,"x"),_gpv(15,"y")]))
+                    ra = float(calculate_angle([_gpv(12,"x"),_gpv(12,"y")],[_gpv(14,"x"),_gpv(14,"y")],[_gpv(16,"x"),_gpv(16,"y")]))
+                    elbow_angle = min(la, ra)
+                    if elbow_angle < 90:
+                        st["stage"] = "down"
+                    elif elbow_angle > 160:
+                        if st["stage"] == "down":
+                            st["counter"] += 1
+                        st["stage"] = "up"
+                except Exception:
+                    pass
 
-            # Rep logic: up when arms extended (>160°), down when chest low (<90°)
-            PUSH_UP_TOP = 160
-            PUSH_UP_BOTTOM = 90
-            client_key = _get_client_key(request)
-            _ensure_push_up_state(client_key)
-            st = _PUSH_UP_RT_STATE[client_key]
-
-            rep_inc = False
-            if elbow_angle < PUSH_UP_BOTTOM:
-                st["stage"] = "down"
-            elif elbow_angle > PUSH_UP_TOP:
-                if st["stage"] == "down":
-                    st["counter"] += 1
-                    rep_inc = True
-                st["stage"] = "up"
-
-            # Coaching message and accuracy (100% when body straight AND at top OR at bottom with good depth)
-            label = "Knee push-up" if is_knee_pushup else "Push-up"
-            if not body_acceptable:
-                msg = f"{label}: Keep your body in a straight line from head to knees. Don't let your hips sag or pike up."
-                acc = max(0, min(45, int(body_line_angle / 180 * 50)))
-                ok = False
-            elif body_straight and st["stage"] == "up" and elbow_angle >= PUSH_UP_TOP:
-                msg = f"{label}: Good form. Body straight, arms extended. Lower for next rep."
+            # Coaching message driven by ML
+            if posture_ok:
+                msg = "Push-up: Good depth! Push back up." if st["stage"] == "down" else "Push-up: Great form! Lower your chest toward the floor."
                 acc = 100
-                ok = True
-            elif body_straight and st["stage"] == "down" and elbow_angle < PUSH_UP_BOTTOM:
-                msg = f"{label}: Good form. Body straight, good depth. Push back up to complete the rep."
-                acc = 100
-                ok = True
-            elif not body_straight and st["stage"] == "up" and elbow_angle >= PUSH_UP_TOP:
-                msg = f"{label}: Straighten your body from shoulders to knees. Don't sag or pike."
-                acc = max(60, min(85, int(body_line_angle / 180 * 100)))
-                ok = False
-            elif st["stage"] == "down":
-                if body_straight:
-                    msg = f"{label}: Good depth. Push back up to complete the rep."
-                    acc = 85
-                else:
-                    msg = f"{label}: Keep a straight line as you push back up."
-                    acc = max(50, min(75, int(body_line_angle / 180 * 100)))
-                ok = False
             else:
-                if elbow_angle < PUSH_UP_BOTTOM + 30:
-                    msg = f"{label}: Lower until your elbows reach about 90°, then push up."
-                else:
-                    msg = f"{label}: Push up until your arms are fully extended."
-                acc = max(0, min(99, int((elbow_angle - PUSH_UP_BOTTOM) / (PUSH_UP_TOP - PUSH_UP_BOTTOM) * 99)))
-                if not body_straight:
-                    acc = min(acc, max(50, int(body_line_angle / 180 * 100)))
-                ok = False
+                msg = "Push-up: Incorrect form — keep your body in a straight line and lower your chest fully."
+                acc = conf
 
             return Response({
-                "message": msg,
-                "accuracy": acc,
-                "posture_ok": ok,
-                "stage": st["stage"],
-                "counter": st["counter"],
+                "message": msg, "accuracy": acc,
+                "posture_ok": posture_ok,
+                "stage": st["stage"], "counter": st["counter"],
             })
 
         # Wall sit: SIDE view only; check ~90° hip + knee angles and hold timer
@@ -2238,179 +2210,72 @@ def stream_process(request):
 
         # Tree pose: rule-based + ideal-pose accuracy so user always sees a number
         if ex_type == "tree_pose":
-            tree_ideal = IDEAL_POSES.get("tree_pose", {}).get("hold")
+            # ML model: all 33 landmarks x 4 = 132 features
+            # 0=correct, 1=incorrect
+            models = get_models()
+            tp_data = models.get("tree_pose")
+            if not tp_data or not tp_data["model"]:
+                return Response({
+                    "message": "Tree Pose: Model not loaded. Check tree_pose_model.pkl exists.",
+                    "accuracy": 0, "posture_ok": False,
+                })
+
             try:
-                tree_acc_int = max(
-                    0, min(100, int(round(_accuracy_vs_ideal(landmarks, tree_ideal))))
-                ) if tree_ideal else 0
-            except (TypeError, KeyError, IndexError, AttributeError):
-                tree_acc_int = 0
+                row = []
+                for lm_item in landmarks:
+                    if isinstance(lm_item, dict):
+                        row.extend([lm_item.get("x",0.5), lm_item.get("y",0.5), lm_item.get("z",0.0), lm_item.get("visibility",0.5)])
+                    else:
+                        row.extend([getattr(lm_item,"x",0.5), getattr(lm_item,"y",0.5), getattr(lm_item,"z",0.0), getattr(lm_item,"visibility",0.5)])
 
-            mp_pose = get_mp_pose()
-            calculate_angle = get_calculate_angle()
-            if mp_pose is None or calculate_angle is None:
-                return Response(
-                    {
-                        "message": "Tree Pose: Pose analysis not available (MediaPipe/angles missing).",
-                        "accuracy": 0,
-                        "posture_ok": False,
-                    }
-                )
+                X_tp = np.array(row).reshape(1, -1)
+                if tp_data["scaler"]:
+                    X_tp = tp_data["scaler"].transform(X_tp)
 
-            VIS = 0.6
+                pred  = tp_data["model"].predict(X_tp)[0]
+                proba = tp_data["model"].predict_proba(X_tp)[0]
+                conf  = int(max(proba) * 100)
+                posture_ok = int(pred) == 0  # 0=correct, 1=incorrect
+            except Exception as e:
+                return Response({
+                    "message": f"Tree Pose: Prediction error — {e}",
+                    "accuracy": 0, "posture_ok": False,
+                })
 
-            _def = {"x": 0.5, "y": 0.5, "visibility": 0.0}
-
-            def lm(name: str):
-                i = mp_pose.PoseLandmark[name].value
-                if i >= len(landmarks):
-                    return _def.copy()
-                p = landmarks[i]
-                if p is None:
-                    return _def.copy()
-                if isinstance(p, dict):
-                    return {"x": p.get("x", 0.5), "y": p.get("y", 0.5), "visibility": p.get("visibility", 0.0)}
-                return {"x": getattr(p, "x", 0.5), "y": getattr(p, "y", 0.5), "visibility": getattr(p, "visibility", 0.0)}
-
-            left_ankle = lm("LEFT_ANKLE")
-            right_ankle = lm("RIGHT_ANKLE")
-            left_knee = lm("LEFT_KNEE")
-            right_knee = lm("RIGHT_KNEE")
-            left_hip = lm("LEFT_HIP")
-            right_hip = lm("RIGHT_HIP")
-            left_shoulder = lm("LEFT_SHOULDER")
-            right_shoulder = lm("RIGHT_SHOULDER")
-
-            if min(
-                left_ankle.get("visibility", 0),
-                right_ankle.get("visibility", 0),
-                left_knee.get("visibility", 0),
-                right_knee.get("visibility", 0),
-                left_hip.get("visibility", 0),
-                right_hip.get("visibility", 0),
-            ) < VIS:
-                return Response(
-                    {
-                        "message": "Tree Pose: Step back so your full legs are visible.",
-                        "accuracy": 0,
-                        "posture_ok": False,
-                    }
-                )
-
-            # Choose standing leg as the one closer to the floor (larger y).
-            standing_side = "LEFT" if left_ankle["y"] > right_ankle["y"] else "RIGHT"
-            lifted_side = "RIGHT" if standing_side == "LEFT" else "LEFT"
-
-            if standing_side == "LEFT":
-                s_ankle, s_knee, s_hip, s_sh = left_ankle, left_knee, left_hip, left_shoulder
-                l_ankle, l_knee, l_hip = right_ankle, right_knee, right_hip
-            else:
-                s_ankle, s_knee, s_hip, s_sh = right_ankle, right_knee, right_hip, right_shoulder
-                l_ankle, l_knee, l_hip = left_ankle, left_knee, left_hip
-
-            # Angles for standing leg straightness and lifted leg bend
-            s_hip_pt = [s_hip["x"], s_hip["y"]]
-            s_knee_pt = [s_knee["x"], s_knee["y"]]
-            s_ankle_pt = [s_ankle["x"], s_ankle["y"]]
-            l_hip_pt = [l_hip["x"], l_hip["y"]]
-            l_knee_pt = [l_knee["x"], l_knee["y"]]
-            l_ankle_pt = [l_ankle["x"], l_ankle["y"]]
-            s_sh_pt = [s_sh["x"], s_sh["y"]]
-
-            standing_knee_angle = float(calculate_angle(s_hip_pt, s_knee_pt, s_ankle_pt))
-            lifted_knee_angle = float(calculate_angle(l_hip_pt, l_knee_pt, l_ankle_pt))
-
-            # Standing leg should be relatively straight.
-            standing_leg_straight = standing_knee_angle > 165.0
-
-            # Lifted leg should be clearly bent.
-            lifted_leg_bent = lifted_knee_angle < 150.0
-
-            # Lifted foot should be higher than standing ankle by a margin (y smaller).
-            foot_lift_height = s_ankle["y"] - l_ankle["y"]
-            foot_lifted = foot_lift_height > 0.12
-
-            # Lifted foot should be near the standing leg horizontally (inside of thigh/calf).
-            foot_side_proximity = abs(l_ankle["x"] - s_knee["x"])
-            foot_near_leg = foot_side_proximity < 0.18
-
-            # Torso vertical over standing leg: shoulder–hip–ankle nearly stacked in x.
-            torso_over_foot = (
-                abs(s_sh["x"] - s_hip["x"]) < 0.08 and abs(s_hip["x"] - s_ankle["x"]) < 0.08
-            )
-
-            # Coaching logic
-            if not foot_lifted or not lifted_leg_bent:
-                # Reset hold timer — pose broken
-                client_key = _get_client_key(request)
-                _ensure_tree_pose_state(client_key)
-                tp = _TREE_POSE_RT_STATE[client_key]
-                tp["hold_start"]  = None
-                tp["rep_counted"] = False
-                return Response(
-                    {
-                        "message": f"Tree Pose: Lift your {lifted_side.lower()} foot and place it on the inner leg of the standing leg.",
-                        "accuracy": 0,
-                        "posture_ok": False,
-                        "counter": tp["counter"],
-                    }
-                )
-
-            if not foot_near_leg:
-                return Response(
-                    {
-                        "message": "Tree Pose: Bring the lifted foot closer to the inside of your standing leg.",
-                        "accuracy": 60,
-                        "posture_ok": False,
-                    }
-                )
-
-            if not torso_over_foot:
-                return Response(
-                    {
-                        "message": "Tree Pose: Keep your spine straight—stack shoulders over hips and over the standing foot.",
-                        "accuracy": 70,
-                        "posture_ok": False,
-                    }
-                )
-
-            if not standing_leg_straight:
-                return Response(
-                    {
-                        "message": "Tree Pose: Straighten the standing leg and keep it strong.",
-                        "accuracy": 80,
-                        "posture_ok": False,
-                    }
-                )
-
-            # All checks passed — run time-based hold counter
+            # Time-based hold counter
             client_key = _get_client_key(request)
             _ensure_tree_pose_state(client_key)
             tp = _TREE_POSE_RT_STATE[client_key]
-
             now_ts = time.time()
-            if tp["hold_start"] is None:
-                tp["hold_start"] = now_ts
-                tp["rep_counted"] = False
 
-            elapsed   = now_ts - tp["hold_start"]
-            remaining = max(0.0, TREE_POSE_HOLD_SECS - elapsed)
+            if posture_ok:
+                if tp["hold_start"] is None:
+                    tp["hold_start"]  = now_ts
+                    tp["rep_counted"] = False
 
-            if elapsed >= TREE_POSE_HOLD_SECS and not tp["rep_counted"]:
-                tp["counter"]    += 1
-                tp["rep_counted"] = True
+                elapsed   = now_ts - tp["hold_start"]
+                remaining = max(0.0, TREE_POSE_HOLD_SECS - elapsed)
 
-            if remaining > 0:
-                hold_msg = f"Tree Pose: Hold steady... {remaining:.1f}s remaining"
-                hold_acc = int(min(99, 50 + (elapsed / TREE_POSE_HOLD_SECS) * 49))
+                if elapsed >= TREE_POSE_HOLD_SECS and not tp["rep_counted"]:
+                    tp["counter"]    += 1
+                    tp["rep_counted"] = True
+
+                if remaining > 0:
+                    msg = f"Tree Pose: Hold steady... {remaining:.1f}s remaining"
+                    acc = int(min(99, 50 + (elapsed / TREE_POSE_HOLD_SECS) * 49))
+                else:
+                    msg = "Tree Pose: Rep complete! Lower your foot and go again."
+                    acc = 100
             else:
-                hold_msg = "Tree Pose: Rep complete! Lower your foot and go again."
-                hold_acc = 100
+                tp["hold_start"]  = None
+                tp["rep_counted"] = False
+                msg = "Tree Pose: Lift one foot and place it on the inner standing leg."
+                acc = conf  # ML confidence = real-time progress feedback
 
             return Response({
-                "message":    hold_msg,
-                "accuracy":   hold_acc,
-                "posture_ok": True,
+                "message":    msg,
+                "accuracy":   acc,
+                "posture_ok": posture_ok,
                 "counter":    tp["counter"],
             })
 
