@@ -1,5 +1,5 @@
-import mediapipe as mp
-import cv2
+# import mediapipe as mp  # not available on s390x
+# import cv2  # not available on s390x
 import numpy as np
 import datetime
 import os
@@ -7,8 +7,8 @@ import math
 from django.conf import settings
 
 # Drawing helpers
-mp_drawing = None  # Lazy init
-mp_pose = None  # Lazy init
+# mp_drawing = None
+# mp_pose = None
 
 # * Mediapipe Utils Functions
 def calculate_angle(point1: list, point2: list, point3: list) -> float:
