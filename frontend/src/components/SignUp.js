@@ -24,8 +24,8 @@ export default function SignUp({ onNavigate }) {
     if (!form.age || Number(form.age) <= 0) return "Enter a valid age";
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!re.test(form.email)) return "Enter a valid email";
-    if (!form.height || Number(form.height) <= 0) return "Enter a valid height (cm)";
-    if (!form.weight || Number(form.weight) <= 0) return "Enter a valid weight (kg)";
+    if (!form.height || Number(form.height) <= 0) return "Enter a valid height (in)";
+    if (!form.weight || Number(form.weight) <= 0) return "Enter a valid weight (lbs)";
     if (!form.password || form.password.length < 6) return "Password must be at least 6 characters";
     if (!form.useEmailAsUsername && !form.username.trim()) return "Enter a username or check 'Use email as username'";
     return "";
@@ -70,24 +70,24 @@ export default function SignUp({ onNavigate }) {
       <div className="card form-card wide">
         <h2>Create Account</h2>
         <form onSubmit={submit} className="form grid">
-          <label>
-            Full name
-            <input
-              type="text"
-              value={form.fullname}
-              onChange={(e) => update("fullname", e.target.value)}
-              placeholder="Jane Doe"
-            />
-          </label>
 
-          <div className="form-fullwidth">
-            <label className="row-inline">
+          <div style={{display:"flex", alignItems:"flex-end", gap:"12px", gridColumn:"1/-1"}}>
+            <label style={{flex:1}}>
+              Full name
+              <input
+                type="text"
+                value={form.fullname}
+                onChange={(e) => update("fullname", e.target.value)}
+                placeholder="Jane Doe"
+              />
+            </label>
+            <label className="row-inline" style={{whiteSpace:"nowrap", paddingBottom:"6px"}}>
               <input
                 type="checkbox"
                 checked={form.useEmailAsUsername}
                 onChange={(e) => update("useEmailAsUsername", e.target.checked)}
               />
-              <span>Use email as username</span>
+              <span style={{marginLeft:"6px"}}>Use email as username</span>
             </label>
           </div>
 
@@ -124,7 +124,7 @@ export default function SignUp({ onNavigate }) {
           </label>
 
           <label>
-            Height (cm)
+            Height (in)
             <input
               type="number"
               value={form.height}
@@ -134,7 +134,7 @@ export default function SignUp({ onNavigate }) {
           </label>
 
           <label>
-            Weight (kg)
+            Weight (lbs)
             <input
               type="number"
               value={form.weight}

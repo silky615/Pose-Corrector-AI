@@ -2491,6 +2491,15 @@ def stream_process(request):
                 abs(s_sh["x"] - s_hip["x"]) < 0.08 and abs(s_hip["x"] - s_ankle["x"]) < 0.08
             )
 
+            # ── Arms check: wrists must be above shoulders ──────────────
+            left_wrist  = lm("LEFT_WRIST")
+            right_wrist = lm("RIGHT_WRIST")
+            avg_shoulder_y = (left_shoulder["y"] + right_shoulder["y"]) / 2
+            best_wrist_y   = min(left_wrist["y"], right_wrist["y"])
+            # In MediaPipe: smaller y = higher in frame
+            # Arms raised = at least one wrist above shoulder level
+            arms_raised = best_wrist_y < avg_shoulder_y - 0.05
+
             # Coaching logic
             if not foot_lifted or not lifted_leg_bent:
                 # Reset hold timer — pose broken
@@ -2503,6 +2512,21 @@ def stream_process(request):
                     {
                         "message": f"Tree Pose: Lift your {lifted_side.lower()} foot and place it on the inner leg of the standing leg.",
                         "accuracy": 0,
+                        "posture_ok": False,
+                        "counter": tp["counter"],
+                    }
+                )
+
+            if not arms_raised:
+                client_key = _get_client_key(request)
+                _ensure_tree_pose_state(client_key)
+                tp = _TREE_POSE_RT_STATE[client_key]
+                tp["hold_start"]  = None
+                tp["rep_counted"] = False
+                return Response(
+                    {
+                        "message": "Tree Pose: Raise both arms above your head.",
+                        "accuracy": 50,
                         "posture_ok": False,
                         "counter": tp["counter"],
                     }
