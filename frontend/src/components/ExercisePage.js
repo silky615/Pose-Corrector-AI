@@ -73,6 +73,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   const postureOkRef = useRef(undefined);
   const sessionIdRef = useRef(null);
   const repAccuraciesRef = useRef([]);
+  const maxCounterRef = useRef(0);
 
   const displayName = useState(() =>
     localStorage.getItem("pc_demo_username") || localStorage.getItem("pc_demo_email") || ""
@@ -142,6 +143,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                   setLiveFeedback(data);
                   postureOkRef.current = data.posture_ok;
                   if (data.accuracy) repAccuraciesRef.current.push(data.accuracy);
+                  if (data.counter && data.counter > maxCounterRef.current) maxCounterRef.current = data.counter;
                 }
               }).catch(() => {});
             }
@@ -168,7 +170,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
 
   function handleBack() {
     if (sessionIdRef.current) {
-      const reps = liveFeedback ? liveFeedback.counter || 0 : 0;
+      const reps = maxCounterRef.current || (liveFeedback ? liveFeedback.counter || 0 : 0);
       const acc = repAccuraciesRef.current.length > 0 ? Math.round(repAccuraciesRef.current.reduce((a,b) => a+b, 0) / repAccuraciesRef.current.length) : 0;
       api.endSession(sessionIdRef.current, reps, acc).catch(() => {});
       sessionIdRef.current = null;
