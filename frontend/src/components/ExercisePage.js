@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { EXERCISES, getExerciseById } from "../data/exercises";
 import * as api from "../api";
+import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 
 const POSE_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
@@ -106,10 +107,10 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     let cancelled = false;
     async function loadPose() {
       try {
-        const vision = await window.FilesetResolver.forVisionTasks(
+        const vision = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
         );
-        poseRef.current = await window.PoseLandmarker.createFromOptions(vision, {
+        poseRef.current = await PoseLandmarker.createFromOptions(vision, {
           baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: "GPU" },
           runningMode: "VIDEO", numPoses: 1,
         });

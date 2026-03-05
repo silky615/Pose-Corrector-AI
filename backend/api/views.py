@@ -1220,7 +1220,7 @@ def stream_process(request):
 
             s = models.get("squat")
             if not s or not s.get("model"):
-                return Response({"message": "Squat: Model not found", "accuracy": 0, "posture_ok": False})
+                pass  # Skip model, use geometric detection below
 
             # Stage prediction (up/down) from model trained on 9 landmarks (repo uses prob threshold).
             # If the model cannot be used (e.g. sklearn version mismatch), we gracefully fall back to
