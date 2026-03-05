@@ -163,7 +163,7 @@ def get_models():
             },
             "squat": {
                 "model": load_machine_learning_model("squat_model.pkl"),
-                "scaler": None,
+                "scaler": load_machine_learning_model("squat_input_scaler.pkl"),
             },
             "lunge": {
                 "stage_model": load_machine_learning_model("lunge_stage_model.pkl"),
@@ -1251,6 +1251,9 @@ def stream_process(request):
                     X_in = np.array([input_row])
 
                 model = s.get("model")
+                scaler = s.get("scaler")
+                if scaler is not None:
+                    X_in = scaler.transform(np.array([input_row]))
                 if model is not None:
                     # Some environments may have sklearn versions that cannot unpickle the
                     # original DecisionTree/ensemble objects cleanly. Wrap in try so we
@@ -1259,7 +1262,8 @@ def stream_process(request):
                     conf = int(max(probs) * 100)
                     prob = float(max(probs))
                     prediction_probability = round(prob, 2)
-                    pred = model.predict(X_in)[0]
+                    raw_pred = model.predict(X_in)[0]
+                    pred = "down" if str(raw_pred) in ["0", "down"] else "up"
                     model_predicted = True
             except Exception as e:
                 print(f"Squat model error: {e}")
@@ -2792,6 +2796,17 @@ def profile(request):
     from django.utils import timezone
     from django.db.models import Avg
     from datetime import timedelta
+    if request.method == "POST":
+        user_id = request.data.get("user_id")
+        try:
+            user = User.objects.get(id=int(user_id))
+            if "age" in request.data: user.age = request.data["age"]
+            if "height" in request.data: user.height = request.data["height"]
+            if "weight" in request.data: user.weight = request.data["weight"]
+            user.save()
+            return JsonResponse({"success": True})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
     user_id = request.query_params.get("user_id")
     if not user_id:
         return JsonResponse({"error": "user_id required"}, status=400)

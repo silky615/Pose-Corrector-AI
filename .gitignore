@@ -21,3 +21,13 @@ backend/static/images/
 .DS_Store
 *.swp
 *.swo
+backend/nohup.out
+backend/backend.log
+backend/frontend.log
+backend/db.sqlite3
+backend/squat_data/
+backend/static/model/squat_test.pkl
+backend/api/views.py.bak
+backend/See
+frontend/FETCH_HEAD
+frontend/frontend.log

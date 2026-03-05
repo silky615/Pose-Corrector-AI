@@ -1,4 +1,6 @@
 """
+import pymysql
+pymysql.install_as_MySQLdb()
 WSGI config for exercise_correction project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.

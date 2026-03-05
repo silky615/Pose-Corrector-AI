@@ -71,6 +71,8 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   const lastSendRef = useRef(0);
   const landmarksRef = useRef(null);
   const postureOkRef = useRef(undefined);
+  const sessionIdRef = useRef(null);
+  const repAccuraciesRef = useRef([]);
 
   const displayName = useState(() =>
     localStorage.getItem("pc_demo_username") || localStorage.getItem("pc_demo_email") || ""
@@ -139,6 +141,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                 if (!cancelled) {
                   setLiveFeedback(data);
                   postureOkRef.current = data.posture_ok;
+                  if (data.accuracy) repAccuraciesRef.current.push(data.accuracy);
                 }
               }).catch(() => {});
             }
@@ -164,6 +167,12 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   }
 
   function handleBack() {
+    if (sessionIdRef.current) {
+      const reps = liveFeedback ? liveFeedback.counter || 0 : 0;
+      const acc = repAccuraciesRef.current.length > 0 ? Math.round(repAccuraciesRef.current.reduce((a,b) => a+b, 0) / repAccuraciesRef.current.length) : 0;
+      api.endSession(sessionIdRef.current, reps, acc).catch(() => {});
+      sessionIdRef.current = null;
+    }
     if (stream) stream.getTracks().forEach((t) => t.stop());
     setMode(null); setStream(null); setUploadFile(null);
     setUploadError(""); setLiveError(""); setLiveFeedback(null);
@@ -172,6 +181,11 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   }
 
   function handleLiveStart() {
+    if (userId) {
+      api.startSession(userId, api.toBackendExerciseType(exerciseId), "live")
+        .then(data => { sessionIdRef.current = data.session_id; })
+        .catch(() => {});
+    }
     setMode("live"); setUploadError(""); setLiveError(""); setLiveFeedback(null); setAnalyzing(true);
   }
 
@@ -414,3 +428,4 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     </div>
   );
 }
+// session tracking enabled
