@@ -48,8 +48,7 @@ export default function SignUp({ onNavigate }) {
 
     const payload = {
       firstName, lastName,
-      email: form.email,
-      password: form.password,
+      email: form.email, password: form.password,
       age: form.age ? Number(form.age) : undefined,
       height: form.height ? Number(form.height) : undefined,
       weight: form.weight ? Number(form.weight) : undefined,
@@ -76,7 +75,7 @@ export default function SignUp({ onNavigate }) {
       background: "radial-gradient(1200px 600px at 10% 20%, rgba(124,58,237,0.12), transparent), radial-gradient(800px 400px at 90% 80%, rgba(6,182,212,0.08), transparent), linear-gradient(180deg,#0f172a,#0b3140)",
       display: "flex", alignItems: "center", justifyContent: "center",
       fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", color: "#e6f7f9",
-      padding: "40px 20px", boxSizing: "border-box",
+      padding: "40px 20px", boxSizing: "border-box", margin: 0,
     }}>
 
       <div style={{
@@ -85,11 +84,9 @@ export default function SignUp({ onNavigate }) {
         borderRadius: "20px",
         border: "1px solid rgba(255,255,255,0.07)",
         boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
-        padding: "48px",
-        boxSizing: "border-box",
+        padding: "48px", boxSizing: "border-box",
       }}>
 
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "32px" }}>
           <div style={{
             width: "52px", height: "52px", borderRadius: "12px",
@@ -110,7 +107,6 @@ export default function SignUp({ onNavigate }) {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
 
-            {/* Full Name */}
             <div style={{ ...labelStyle, gridColumn: "1 / -1" }}>
               Full Name
               <input type="text" value={form.fullname} onChange={e => update("fullname", e.target.value)}
@@ -119,7 +115,6 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
             </div>
 
-            {/* Email */}
             <div style={{ ...labelStyle, gridColumn: "1 / -1" }}>
               Email Address
               <input type="email" value={form.email} onChange={e => update("email", e.target.value)}
@@ -128,7 +123,6 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
             </div>
 
-            {/* Age */}
             <div style={labelStyle}>
               Age
               <input type="number" value={form.age} onChange={e => update("age", e.target.value)}
@@ -137,7 +131,6 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
             </div>
 
-            {/* Height */}
             <div style={labelStyle}>
               Height (cm)
               <input type="number" value={form.height} onChange={e => update("height", e.target.value)}
@@ -146,7 +139,6 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
             </div>
 
-            {/* Weight */}
             <div style={labelStyle}>
               Weight (kg)
               <input type="number" value={form.weight} onChange={e => update("weight", e.target.value)}
@@ -155,7 +147,6 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
             </div>
 
-            {/* Password */}
             <div style={labelStyle}>
               Password
               <div style={{ position: "relative" }}>
@@ -179,20 +170,14 @@ export default function SignUp({ onNavigate }) {
           </p>
 
           {error && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: "8px", padding: "12px 14px",
-              background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)",
-              borderRadius: "10px", color: "#fca5a5", fontSize: "13px",
-            }}>⚠️ {error}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 14px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "10px", color: "#fca5a5", fontSize: "13px" }}>
+              ⚠️ {error}
+            </div>
           )}
 
-          <button type="submit" disabled={isLoading} style={{
-            width: "100%", padding: "15px",
-            background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
-            border: "none", borderRadius: "12px", color: "white",
-            fontSize: "15px", fontWeight: "700", cursor: "pointer",
-            opacity: isLoading ? 0.7 : 1, marginTop: "4px",
-          }}>{isLoading ? "Creating account..." : "Create Account 🚀"}</button>
+          <button type="submit" disabled={isLoading} style={{ width: "100%", padding: "15px", background: "linear-gradient(135deg, #7c3aed, #06b6d4)", border: "none", borderRadius: "12px", color: "white", fontSize: "15px", fontWeight: "700", cursor: "pointer", opacity: isLoading ? 0.7 : 1, marginTop: "4px" }}>
+            {isLoading ? "Creating account..." : "Create Account 🚀"}
+          </button>
 
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <span style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.07)" }} />
@@ -200,17 +185,9 @@ export default function SignUp({ onNavigate }) {
             <span style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.07)" }} />
           </div>
 
-          <button type="button" onClick={() => onNavigate("signin")} style={{
-            width: "100%", padding: "13px",
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "12px", color: "rgba(255,255,255,0.75)",
-            fontSize: "14px", fontWeight: "600", cursor: "pointer",
-          }}>Sign In Instead</button>
-
-          <button type="button" onClick={() => onNavigate("index")} style={{
-            background: "none", border: "none", color: "rgba(255,255,255,0.25)",
-            fontSize: "13px", cursor: "pointer", textAlign: "center", padding: "4px 0",
-          }}>← Back to home</button>
+          <button type="button" onClick={() => onNavigate("signin")} style={{ width: "100%", padding: "13px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "rgba(255,255,255,0.75)", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}>
+            Sign In Instead
+          </button>
 
         </form>
       </div>
