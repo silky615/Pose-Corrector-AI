@@ -1,0 +1,23 @@
+# Frontend
+frontend/node_modules/
+frontend/build/
+frontend/.env
+frontend/.env.local
+frontend/npm-debug.log*
+
+# Backend
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.py[cod]
+*.sqlite3
+backend/.env
+backend/static/media/
+backend/static/images/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo

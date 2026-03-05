@@ -1,0 +1,14 @@
+# Pose Corrector App – Backend dependencies
+# Python 3.8+
+
+Django>=3.2
+djangorestframework>=3.12
+django-cors-headers>=4.0
+django-extensions>=3.2
+pymysql>=1.0
+numpy>=1.21
+# Models in this repo were trained with scikit-learn >= 1.4 (uses DecisionTree monotonic_cst).
+scikit-learn>=1.4,<2
+# Optional: MediaPipe improves pose detection. Not available on all platforms (e.g. IBM LinuxONE/s390x).
+# If pip install fails for mediapipe, skip it; the app uses a built-in landmark fallback.
+# pip install -r requirements-mediapipe.txt  # optional, for x86_64/arm64 only
