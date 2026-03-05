@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import LogoHeader from "./LogoHeader";
 import * as api from "../api";
 
 export default function SignIn({ onNavigate }) {
@@ -31,7 +30,6 @@ export default function SignIn({ onNavigate }) {
     setError("");
     const v = validate();
     if (v) return setError(v);
-
     setIsLoading(true);
     try {
       const data = await api.signin(email, password);
@@ -48,445 +46,240 @@ export default function SignIn({ onNavigate }) {
   }
 
   const features = [
-    { icon: "🤸", title: "Real-time Pose Analysis", desc: "AI tracks your body movements live" },
+    { icon: "🤸", title: "Real-time Pose Analysis", desc: "AI tracks your body movements frame by frame" },
     { icon: "🎯", title: "Form Correction", desc: "Instant feedback on your exercise technique" },
     { icon: "📊", title: "Progress Tracking", desc: "Monitor your improvement over time" },
+    { icon: "💪", title: "6+ Exercises", desc: "Squats, planks, curls, lunges and more" },
   ];
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
+    <div style={{
+      minHeight: "100vh",
+      width: "100vw",
+      background: "radial-gradient(1200px 600px at 10% 20%, rgba(124,58,237,0.12), transparent), radial-gradient(800px 400px at 90% 80%, rgba(6,182,212,0.08), transparent), linear-gradient(180deg,#0f172a,#0b3140)",
+      display: "flex",
+      alignItems: "stretch",
+      fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+      color: "#e6f7f9",
+      boxSizing: "border-box",
+      overflow: "hidden",
+    }}>
 
-        {/* ── LEFT PANEL ── */}
-        <div style={styles.leftPanel}>
-          <div style={styles.leftContent}>
-            <div style={styles.badge}>PC</div>
-            <h1 style={styles.leftTitle}>Pose Corrector AI</h1>
-            <p style={styles.leftSub}>Exercise form feedback — smarter, safer, stronger!</p>
+      {/* ── LEFT PANEL ── */}
+      <div style={{
+        flex: "1 1 50%",
+        background: "linear-gradient(145deg, rgba(124,58,237,0.3), rgba(6,182,212,0.1))",
+        borderRight: "1px solid rgba(255,255,255,0.07)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "60px 64px",
+        minHeight: "100vh",
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "28px", maxWidth: "480px", width: "100%" }}>
 
-            <div style={styles.featureList}>
-              {features.map((f, i) => (
-                <div key={i} style={styles.featureItem}>
-                  <span style={styles.featureIcon}>{f.icon}</span>
-                  <div>
-                    <div style={styles.featureTitle}>{f.title}</div>
-                    <div style={styles.featureDesc}>{f.desc}</div>
-                  </div>
+          {/* Logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{
+              width: "68px", height: "68px", borderRadius: "16px",
+              background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontWeight: "800", fontSize: "22px", color: "white",
+              boxShadow: "0 8px 30px rgba(124,58,237,0.4)", flexShrink: 0,
+            }}>PC</div>
+            <div>
+              <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "700", color: "white" }}>Pose Corrector AI</h1>
+              <p style={{ margin: "4px 0 0", fontSize: "13px", color: "rgba(255,255,255,0.5)" }}>
+                Exercise form feedback — smarter, safer, stronger!
+              </p>
+            </div>
+          </div>
+
+          {/* Tagline */}
+          <div>
+            <h2 style={{ margin: "0 0 10px", fontSize: "32px", fontWeight: "800", color: "white", lineHeight: 1.2 }}>
+              Train smarter,<br />
+              <span style={{ background: "linear-gradient(90deg, #7c3aed, #06b6d4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                not harder.
+              </span>
+            </h2>
+            <p style={{ margin: 0, fontSize: "15px", color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>
+              Get real-time AI feedback on your workout form and prevent injuries before they happen.
+            </p>
+          </div>
+
+          {/* Features */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {features.map((f, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "flex-start", gap: "16px",
+                padding: "16px 18px",
+                background: "rgba(255,255,255,0.04)",
+                borderRadius: "12px",
+                border: "1px solid rgba(255,255,255,0.06)",
+              }}>
+                <span style={{ fontSize: "24px", flexShrink: 0, marginTop: "1px" }}>{f.icon}</span>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: "600", color: "rgba(255,255,255,0.9)", marginBottom: "3px" }}>{f.title}</div>
+                  <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>{f.desc}</div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
 
-            <div style={styles.statsRow}>
-              <div style={styles.stat}><span style={styles.statNum}>6+</span><span style={styles.statLabel}>Exercises</span></div>
-              <div style={styles.statDivider} />
-              <div style={styles.stat}><span style={styles.statNum}>AI</span><span style={styles.statLabel}>Powered</span></div>
-              <div style={styles.statDivider} />
-              <div style={styles.stat}><span style={styles.statNum}>Live</span><span style={styles.statLabel}>Feedback</span></div>
-            </div>
+          {/* Stats */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            padding: "20px 24px",
+            background: "rgba(255,255,255,0.04)",
+            borderRadius: "14px",
+            border: "1px solid rgba(255,255,255,0.07)",
+          }}>
+            {[["6+", "Exercises"], ["AI", "Powered"], ["Live", "Feedback"], ["Free", "To Use"]].map(([num, label], i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <div style={{ width: "1px", height: "36px", background: "rgba(255,255,255,0.08)", margin: "0 16px" }} />}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+                  <span style={{ fontSize: "20px", fontWeight: "700", color: "#06b6d4" }}>{num}</span>
+                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", marginTop: "3px" }}>{label}</span>
+                </div>
+              </React.Fragment>
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* ── RIGHT PANEL ── */}
-        <div style={styles.rightPanel}>
-          <div style={styles.formBox}>
-            <div style={styles.formHeader}>
-              <h2 style={styles.formTitle}>Welcome back 👋</h2>
-              <p style={styles.formSub}>Sign in to continue your fitness journey</p>
+      {/* ── RIGHT PANEL ── */}
+      <div style={{
+        flex: "1 1 50%",
+        background: "rgba(11,18,33,0.98)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "60px 64px",
+        minHeight: "100vh",
+      }}>
+        <div style={{ width: "100%", maxWidth: "440px" }}>
+
+          <div style={{ marginBottom: "40px" }}>
+            <h2 style={{ margin: "0 0 8px", fontSize: "32px", fontWeight: "700", color: "white" }}>
+              Welcome back 👋
+            </h2>
+            <p style={{ margin: 0, fontSize: "15px", color: "rgba(255,255,255,0.4)" }}>
+              Sign in to continue your fitness journey
+            </p>
+          </div>
+
+          <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+            {/* Email */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <label style={{ fontSize: "13px", fontWeight: "600", color: "rgba(255,255,255,0.7)" }}>Email address</label>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", fontSize: "16px" }}>✉️</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  style={{
+                    width: "100%", padding: "14px 16px 14px 46px",
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "12px", color: "white", fontSize: "15px",
+                    outline: "none", boxSizing: "border-box",
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#7c3aed'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                />
+              </div>
             </div>
 
-            <form onSubmit={submit} style={styles.form}>
-              {/* Email */}
-              <div style={styles.fieldGroup}>
-                <label style={styles.label}>Email</label>
-                <div style={styles.inputWrap}>
-                  <span style={styles.inputIcon}>✉️</span>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    style={styles.input}
-                    onFocus={e => e.target.style.borderColor = '#7c3aed'}
-                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-                  />
-                </div>
+            {/* Password */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <label style={{ fontSize: "13px", fontWeight: "600", color: "rgba(255,255,255,0.7)" }}>Password</label>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", fontSize: "16px" }}>🔒</span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  style={{
+                    width: "100%", padding: "14px 50px 14px 46px",
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "12px", color: "white", fontSize: "15px",
+                    outline: "none", boxSizing: "border-box",
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#7c3aed'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                />
+                <button type="button" onClick={() => setShowPassword(v => !v)} style={{
+                  position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer", fontSize: "18px", padding: "4px",
+                }}>{showPassword ? "🙈" : "👁️"}</button>
               </div>
+            </div>
 
-              {/* Password */}
-              <div style={styles.fieldGroup}>
-                <label style={styles.label}>Password</label>
-                <div style={styles.inputWrap}>
-                  <span style={styles.inputIcon}>🔒</span>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    style={{ ...styles.input, paddingRight: "48px" }}
-                    onFocus={e => e.target.style.borderColor = '#7c3aed'}
-                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(v => !v)}
-                    style={styles.eyeBtn}
-                  >
-                    {showPassword ? "🙈" : "👁️"}
-                  </button>
-                </div>
-              </div>
+            {/* Remember + Forgot */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}
+                  style={{ width: "16px", height: "16px", accentColor: "#7c3aed" }} />
+                <span style={{ fontSize: "14px", color: "rgba(255,255,255,0.55)" }}>Remember me</span>
+              </label>
+              <button type="button" style={{
+                background: "none", border: "none", color: "#06b6d4",
+                fontSize: "14px", cursor: "pointer", padding: 0, textDecoration: "underline",
+              }} onClick={() => onNavigate("reset-password")}>Forgot password?</button>
+            </div>
 
-              {/* Remember me + Forgot password */}
-              <div style={styles.rowBetween}>
-                <label style={styles.checkLabel}>
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(e) => setRemember(e.target.checked)}
-                    style={styles.checkbox}
-                  />
-                  <span style={styles.checkText}>Remember me</span>
-                </label>
-                <button
-                  type="button"
-                  style={styles.forgotBtn}
-                  onClick={() => onNavigate("reset-password")}
-                >
-                  Forgot password?
-                </button>
-              </div>
+            {/* Error */}
+            {error && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: "10px",
+                padding: "14px 16px",
+                background: "rgba(239,68,68,0.12)",
+                border: "1px solid rgba(239,68,68,0.3)",
+                borderRadius: "12px", color: "#fca5a5", fontSize: "14px",
+              }}>⚠️ {error}</div>
+            )}
 
-              {/* Error */}
-              {error && (
-                <div style={styles.errorBox}>
-                  <span>⚠️</span> {error}
-                </div>
-              )}
+            {/* Submit */}
+            <button type="submit" disabled={isLoading} style={{
+              width: "100%", padding: "16px",
+              background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
+              border: "none", borderRadius: "12px", color: "white",
+              fontSize: "16px", fontWeight: "700", cursor: "pointer",
+              opacity: isLoading ? 0.7 : 1, marginTop: "4px",
+            }}>{isLoading ? "Signing in..." : "Sign In →"}</button>
 
-              {/* Submit */}
-              <button
-                type="submit"
-                style={isLoading ? { ...styles.submitBtn, opacity: 0.7 } : styles.submitBtn}
-                disabled={isLoading}
-              >
-                {isLoading ? "Signing in..." : "Sign In →"}
-              </button>
+            {/* Divider */}
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <span style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.07)" }} />
+              <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.25)" }}>New here?</span>
+              <span style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.07)" }} />
+            </div>
 
-              {/* Divider */}
-              <div style={styles.divider}>
-                <span style={styles.dividerLine} />
-                <span style={styles.dividerText}>New here?</span>
-                <span style={styles.dividerLine} />
-              </div>
+            <button type="button" onClick={() => onNavigate("signup")} style={{
+              width: "100%", padding: "14px",
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "12px", color: "rgba(255,255,255,0.75)",
+              fontSize: "15px", fontWeight: "600", cursor: "pointer",
+            }}>Create an account</button>
 
-              {/* Sign up link */}
-              <button
-                type="button"
-                style={styles.signupBtn}
-                onClick={() => onNavigate("signup")}
-              >
-                Create an account
-              </button>
+            <button type="button" onClick={() => onNavigate("index")} style={{
+              background: "none", border: "none",
+              color: "rgba(255,255,255,0.25)", fontSize: "13px",
+              cursor: "pointer", textAlign: "center", padding: "4px 0",
+            }}>← Back to home</button>
 
-              <button
-                type="button"
-                style={styles.backLink}
-                onClick={() => onNavigate("index")}
-              >
-                ← Back to home
-              </button>
-            </form>
-          </div>
+          </form>
         </div>
       </div>
     </div>
   );
 }
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "24px",
-    boxSizing: "border-box",
-  },
-  container: {
-    display: "flex",
-    width: "100%",
-    maxWidth: "960px",
-    minHeight: "580px",
-    borderRadius: "20px",
-    overflow: "hidden",
-    boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
-    border: "1px solid rgba(255,255,255,0.07)",
-  },
-
-  /* LEFT */
-  leftPanel: {
-    flex: 1,
-    background: "linear-gradient(145deg, rgba(124,58,237,0.35), rgba(6,182,212,0.15))",
-    backdropFilter: "blur(20px)",
-    borderRight: "1px solid rgba(255,255,255,0.07)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "48px 40px",
-  },
-  leftContent: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "20px",
-  },
-  badge: {
-    width: "60px",
-    height: "60px",
-    borderRadius: "14px",
-    background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "800",
-    fontSize: "20px",
-    color: "white",
-    boxShadow: "0 8px 30px rgba(124,58,237,0.4)",
-  },
-  leftTitle: {
-    margin: 0,
-    fontSize: "26px",
-    fontWeight: "700",
-    color: "white",
-    lineHeight: 1.2,
-  },
-  leftSub: {
-    margin: 0,
-    fontSize: "13px",
-    color: "rgba(255,255,255,0.55)",
-    lineHeight: 1.5,
-  },
-  featureList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-    marginTop: "8px",
-  },
-  featureItem: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "14px",
-  },
-  featureIcon: {
-    fontSize: "22px",
-    marginTop: "2px",
-    flexShrink: 0,
-  },
-  featureTitle: {
-    fontSize: "14px",
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.9)",
-    marginBottom: "2px",
-  },
-  featureDesc: {
-    fontSize: "12px",
-    color: "rgba(255,255,255,0.45)",
-  },
-  statsRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "16px",
-    marginTop: "12px",
-    padding: "16px",
-    background: "rgba(255,255,255,0.04)",
-    borderRadius: "12px",
-    border: "1px solid rgba(255,255,255,0.07)",
-  },
-  stat: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    flex: 1,
-  },
-  statNum: {
-    fontSize: "18px",
-    fontWeight: "700",
-    color: "#06b6d4",
-  },
-  statLabel: {
-    fontSize: "11px",
-    color: "rgba(255,255,255,0.4)",
-    marginTop: "2px",
-  },
-  statDivider: {
-    width: "1px",
-    height: "32px",
-    background: "rgba(255,255,255,0.1)",
-  },
-
-  /* RIGHT */
-  rightPanel: {
-    flex: 1,
-    background: "rgba(15,23,42,0.95)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "48px 40px",
-  },
-  formBox: {
-    width: "100%",
-    maxWidth: "360px",
-  },
-  formHeader: {
-    marginBottom: "32px",
-  },
-  formTitle: {
-    margin: "0 0 6px",
-    fontSize: "26px",
-    fontWeight: "700",
-    color: "white",
-  },
-  formSub: {
-    margin: 0,
-    fontSize: "13px",
-    color: "rgba(255,255,255,0.45)",
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "18px",
-  },
-  fieldGroup: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "7px",
-  },
-  label: {
-    fontSize: "13px",
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.7)",
-  },
-  inputWrap: {
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-  },
-  inputIcon: {
-    position: "absolute",
-    left: "14px",
-    fontSize: "15px",
-    pointerEvents: "none",
-    zIndex: 1,
-  },
-  input: {
-    width: "100%",
-    padding: "12px 14px 12px 42px",
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: "10px",
-    color: "white",
-    fontSize: "14px",
-    outline: "none",
-    transition: "border-color 0.2s",
-    boxSizing: "border-box",
-  },
-  eyeBtn: {
-    position: "absolute",
-    right: "12px",
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    fontSize: "16px",
-    padding: "4px",
-    lineHeight: 1,
-  },
-  rowBetween: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  checkLabel: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    cursor: "pointer",
-  },
-  checkbox: {
-    width: "15px",
-    height: "15px",
-    accentColor: "#7c3aed",
-  },
-  checkText: {
-    fontSize: "13px",
-    color: "rgba(255,255,255,0.6)",
-  },
-  forgotBtn: {
-    background: "none",
-    border: "none",
-    color: "#06b6d4",
-    fontSize: "13px",
-    cursor: "pointer",
-    padding: 0,
-    textDecoration: "underline",
-  },
-  errorBox: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "12px 14px",
-    background: "rgba(239,68,68,0.15)",
-    border: "1px solid rgba(239,68,68,0.3)",
-    borderRadius: "10px",
-    color: "#fca5a5",
-    fontSize: "13px",
-  },
-  submitBtn: {
-    width: "100%",
-    padding: "14px",
-    background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
-    border: "none",
-    borderRadius: "10px",
-    color: "white",
-    fontSize: "15px",
-    fontWeight: "700",
-    cursor: "pointer",
-    transition: "opacity 0.2s, transform 0.1s",
-    letterSpacing: "0.3px",
-  },
-  divider: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-  },
-  dividerLine: {
-    flex: 1,
-    height: "1px",
-    background: "rgba(255,255,255,0.08)",
-  },
-  dividerText: {
-    fontSize: "12px",
-    color: "rgba(255,255,255,0.3)",
-    whiteSpace: "nowrap",
-  },
-  signupBtn: {
-    width: "100%",
-    padding: "12px",
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: "10px",
-    color: "rgba(255,255,255,0.8)",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-  },
-  backLink: {
-    background: "none",
-    border: "none",
-    color: "rgba(255,255,255,0.3)",
-    fontSize: "13px",
-    cursor: "pointer",
-    textAlign: "center",
-    padding: "4px 0",
-  },
-};
