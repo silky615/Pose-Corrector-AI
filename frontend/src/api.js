@@ -46,6 +46,37 @@ export async function signin(email, password) {
 }
 
 /**
+ * POST /api/auth/forgot
+ * Body: { email }
+ * Sends a password reset link to the user's email (dev: link also printed in backend console).
+ */
+export async function requestPasswordReset(email) {
+  const res = await fetch(getApiUrl("/api/auth/forgot"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Reset failed (${res.status})`);
+  return data;
+}
+
+/**
+ * POST /api/auth/reset-confirm
+ * Body: { uid, token, new_password }
+ */
+export async function resetPasswordWithToken(uid, token, newPassword) {
+  const res = await fetch(getApiUrl("/api/auth/reset-confirm"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uid, token, new_password: newPassword }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Reset failed (${res.status})`);
+  return data;
+}
+
+/**
  * POST /api/auth/signup
  * Body: { firstName, lastName, email, password, age?, height?, weight? }
  */
@@ -135,15 +166,31 @@ export async function uploadVideo(file, exerciseType, userId = null) {
   return data;
 }
 
+/**
+ * GET /api/profile?user_id=<id>
+ * Returns: { name, email, age?, height?, weight?, totalWorkouts, thisWeek, streakDays, avgScore, recentWorkouts[], weeklyActivity[] }
+ * Backend can aggregate from User + Session models.
+ */
+export async function getProfile(userId) {
+  const url = `${getApiUrl("/api/profile")}?user_id=${encodeURIComponent(userId)}`;
+  const res = await fetch(url);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to load profile");
+  return data;
+}
+
 const api = {
   getApiUrl,
   toBackendExerciseType,
   signin,
   signup,
+  requestPasswordReset,
+  resetPasswordWithToken,
   startSession,
   endSession,
   streamAnalysis,
   uploadVideo,
+  getProfile,
 };
 
 export default api;

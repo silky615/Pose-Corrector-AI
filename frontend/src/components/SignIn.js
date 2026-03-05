@@ -81,6 +81,31 @@ export default function SignIn({ onNavigate }) {
 
           {error && <div className="error">{error}</div>}
 
+          <button
+            type="button"
+            className="link-button"
+            onClick={async () => {
+              setError("");
+              if (!email.trim()) {
+                setError("Enter your email above first.");
+                return;
+              }
+              const re = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+              if (!re.test(email.trim())) {
+                setError("Enter a valid email before requesting reset.");
+                return;
+              }
+              try {
+                await api.requestPasswordReset(email.trim());
+                setError("If that email exists, we've sent a reset link.");
+              } catch (err) {
+                setError(err.message || "Could not send reset link.");
+              }
+            }}
+          >
+            Forgot password?
+          </button>
+
           <div className="button-row">
             <button type="submit" className="btn primary">Sign In</button>
             <button type="button" className="btn ghost" onClick={() => onNavigate("index")}>

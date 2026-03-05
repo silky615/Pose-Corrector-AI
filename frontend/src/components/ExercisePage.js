@@ -74,6 +74,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   const [uploadResult, setUploadResult] = useState(null);
   const [liveFeedback, setLiveFeedback] = useState(null);
   const [liveError, setLiveError] = useState("");
+  const [liveExerciseId, setLiveExerciseId] = useState(exerciseId);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const poseRef = useRef(null);
@@ -158,7 +159,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                 postureOkRef.current
               );
               api
-                .streamAnalysis(exerciseId, landmarks, false)
+                .streamAnalysis(liveExerciseId, landmarks, false)
                 .then((data) => {
                   if (!cancelled) {
                     postureOkRef.current = data.posture_ok;
@@ -192,7 +193,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
       cancelled = true;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [mode, stream, exerciseId]);
+  }, [mode, stream, liveExerciseId]);
 
   function handleSignOut() {
     if (stream) stream.getTracks().forEach((t) => t.stop());
@@ -217,6 +218,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   }
 
   function handleLiveStart() {
+    setLiveExerciseId(exerciseId);
     setMode("live");
     setUploadError("");
     setLiveError("");
@@ -224,8 +226,15 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     setAnalyzing(true);
   }
 
+  function handleLiveExerciseChange(newId) {
+    setLiveExerciseId(newId);
+    setLiveFeedback(null);
+    postureOkRef.current = undefined;
+    api.streamAnalysis(newId, [], true).then((data) => setLiveFeedback(data)).catch(() => {});
+  }
+
   function handleResetCounter() {
-    api.streamAnalysis(exerciseId, [], true).then((data) => setLiveFeedback(data)).catch(() => {});
+    api.streamAnalysis(liveExerciseId, [], true).then((data) => setLiveFeedback(data)).catch(() => {});
   }
 
   function handleUploadChange(e) {
@@ -364,9 +373,23 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
             </div>
           </div>
         ) : mode === "live" ? (
-          <div className="exercise-live-wrap">
+          <div className="exercise-live-wrap exercise-live-wrap--big">
+            <p className="exercise-live-all-label">Live workout — all exercises</p>
+            <div className="exercise-live-pills">
+              {EXERCISES.map((ex) => (
+                <button
+                  key={ex.id}
+                  type="button"
+                  className={`exercise-live-pill ${liveExerciseId === ex.id ? "active" : ""}`}
+                  onClick={() => handleLiveExerciseChange(ex.id)}
+                >
+                  <span className="exercise-live-pill-emoji" role="img" aria-hidden="true">{ex.emoji}</span>
+                  <span className="exercise-live-pill-name">{ex.name}</span>
+                </button>
+              ))}
+            </div>
             <div
-              className={`exercise-video-container ${
+              className={`exercise-video-container exercise-video-container--big ${
                 liveFeedback && typeof liveFeedback.posture_ok === "boolean"
                   ? liveFeedback.posture_ok
                     ? "posture-correct"
@@ -392,7 +415,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
             )}
             {liveFeedback && (
               <div
-                className={`exercise-feedback ${
+                className={`exercise-feedback exercise-feedback--big ${
                   typeof liveFeedback.posture_ok === "boolean"
                     ? liveFeedback.posture_ok
                       ? "posture-correct"

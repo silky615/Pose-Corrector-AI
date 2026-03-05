@@ -19,6 +19,8 @@ print("=" * 60)
 from django.conf import settings
 from django.http import StreamingHttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.core.mail import send_mail
+from django.contrib.auth.tokens import default_token_generator
 from rest_framework import status
 from rest_framework.decorators import (
     api_view,
@@ -2692,13 +2694,170 @@ def signin(request):
     try:
         user = User.objects.get(email=data["email"])
         if check_password(data["password"], user.password_hash):
-            return JsonResponse({"success": True, "user_id": user.id,
-                                 "name": user.first_name, "email": user.email})
+            return JsonResponse(
+                {"success": True, "user_id": user.id, "name": user.first_name, "email": user.email}
+            )
         return JsonResponse({"error": "Incorrect password"}, status=401)
     except User.DoesNotExist:
         return JsonResponse({"error": "No account found with that email"}, status=404)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+
+# ─── Forgot / Reset Password (email link) ─────────────────────────────────────
+@api_view(["POST"])
+def forgot_password(request):
+    """
+    Request a password reset link.
+    Body: { "email": "user@example.com" }
+    For local/dev, the reset URL is printed to the backend console.
+    """
+    from api.models import User
+
+    data = request.data
+    email = data.get("email")
+    if not email:
+        return JsonResponse({"error": "email required"}, status=400)
+
+    # Always respond success to avoid leaking which emails exist
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return JsonResponse({"success": True})
+
+    token = default_token_generator.make_token(user)
+    uid = str(user.id)
+    origin = request.headers.get("Origin") or "http://localhost:3002"
+    origin = origin.rstrip("/")
+    reset_url = f"{origin}/#reset-password?uid={uid}&token={token}"
+
+    subject = "Reset your Pose Corrector AI password"
+    message = (
+        "Hi,\n\n"
+        "Click the link below to reset your password:\n"
+        f"{reset_url}\n\n"
+        "If you didn’t request this, you can ignore this email.\n"
+    )
+    try:
+        send_mail(
+            subject,
+            message,
+            getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@localhost"),
+            [user.email],
+            fail_silently=True,
+        )
+    except Exception as e:
+        print(f"[forgot_password] send_mail error: {e}")
+    print(f"[RESET LINK] {reset_url}")
+    return JsonResponse({"success": True})
+
+
+@api_view(["POST"])
+def reset_password_confirm(request):
+    """
+    Confirm password reset.
+    Body: { "uid": "<user_id>", "token": "<token>", "new_password": "..." }
+    """
+    from api.models import User
+
+    data = request.data
+    uid = data.get("uid")
+    token = data.get("token")
+    new_password = data.get("new_password")
+    if not uid or not token or not new_password:
+        return JsonResponse({"error": "uid, token, new_password required"}, status=400)
+    if len(new_password) < 6:
+        return JsonResponse({"error": "Password must be at least 6 characters"}, status=400)
+
+    try:
+        user = User.objects.get(id=int(uid))
+    except (User.DoesNotExist, ValueError):
+        return JsonResponse({"error": "Invalid user"}, status=400)
+
+    if not default_token_generator.check_token(user, token):
+        return JsonResponse({"error": "Invalid or expired token"}, status=400)
+
+    try:
+        user.password_hash = make_password(new_password)
+        user.save(update_fields=["password_hash"])
+        return JsonResponse({"success": True})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+# ─── Profile (stats + recent workouts) ────────────────────────────────────────
+@api_view(["GET"])
+def profile(request):
+    from api.models import User, Session
+    from django.utils import timezone
+    from django.db.models import Avg
+    from datetime import timedelta
+    user_id = request.query_params.get("user_id")
+    if not user_id:
+        return JsonResponse({"error": "user_id required"}, status=400)
+    try:
+        user = User.objects.get(id=int(user_id))
+    except (User.DoesNotExist, ValueError):
+        return JsonResponse({"error": "User not found"}, status=404)
+    today = timezone.now().date()
+    week_start = today - timedelta(days=today.weekday())
+    sessions = Session.objects.filter(user=user).exclude(ended_at__isnull=True)
+    total_workouts = sessions.count()
+    this_week = sessions.filter(ended_at__date__gte=week_start).count()
+    recent = sessions.order_by("-ended_at")[:10]
+    recent_workouts = [
+        {
+            "exercise_type": s.exercise_type,
+            "date": s.ended_at.strftime("%Y-%m-%d") if s.ended_at else "",
+            "reps": s.total_reps or 0,
+            "accuracy": float(s.avg_accuracy) if s.avg_accuracy is not None else 0,
+        }
+        for s in recent
+    ]
+    avg_score = sessions.aggregate(avg=Avg("avg_accuracy"))["avg"]
+    avg_score = round(float(avg_score), 0) if avg_score is not None else 0
+    # Simple streak: days with at least one session ending that day, going back from today
+    streak = 0
+    d = today
+    while True:
+        if sessions.filter(ended_at__date=d).exists():
+            streak += 1
+            d -= timedelta(days=1)
+        else:
+            break
+    # Weekly activity: current week Mon–Sun
+    week_days = [week_start + timedelta(days=i) for i in range(7)]
+    weekly_activity = [sessions.filter(ended_at__date=d).exists() for d in week_days]
+    # Exercise summary: per exercise_type -> sessions, total reps, avg accuracy
+    from django.db.models import Sum
+    from collections import defaultdict
+    summary = defaultdict(lambda: {"sessions": 0, "totalReps": 0, "avgAccuracy": 0})
+    for s in sessions:
+        summary[s.exercise_type]["sessions"] += 1
+        summary[s.exercise_type]["totalReps"] += s.total_reps or 0
+        acc = float(s.avg_accuracy) if s.avg_accuracy is not None else 0
+        n = summary[s.exercise_type]["sessions"]
+        prev_avg = summary[s.exercise_type]["avgAccuracy"]
+        summary[s.exercise_type]["avgAccuracy"] = round((prev_avg * (n - 1) + acc) / n, 0)
+    exerciseSummary = [
+        {"exercise_type": k, "sessions": v["sessions"], "totalReps": v["totalReps"], "avgAccuracy": int(v["avgAccuracy"])}
+        for k, v in summary.items()
+    ]
+    return JsonResponse({
+        "name": f"{user.first_name} {user.last_name}".strip() or user.email,
+        "email": user.email,
+        "age": user.age,
+        "height": float(user.height) if user.height is not None else None,
+        "weight": float(user.weight) if user.weight is not None else None,
+        "memberSince": user.created_at.strftime("%Y-%m-%d") if getattr(user, "created_at", None) else None,
+        "totalWorkouts": total_workouts,
+        "thisWeek": this_week,
+        "streakDays": streak,
+        "avgScore": int(avg_score),
+        "recentWorkouts": recent_workouts,
+        "weeklyActivity": weekly_activity,
+        "exerciseSummary": exerciseSummary,
+    })
 
 
 # ─── Start Session ────────────────────────────────────────────────────────────

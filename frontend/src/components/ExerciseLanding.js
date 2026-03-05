@@ -26,6 +26,13 @@ export default function ExerciseLanding({ onNavigate }) {
           <span className="dashboard-title">Pose Corrector AI</span>
         </div>
         <div className="dashboard-user">
+          <button
+            type="button"
+            className="btn outline btn-sm"
+            onClick={() => onNavigate("profile")}
+          >
+            Profile
+          </button>
           <span className="dashboard-username">👤 {welcomeName}</span>
           <button
             type="button"

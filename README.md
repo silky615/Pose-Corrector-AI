@@ -57,3 +57,10 @@ Exercise IDs are mapped automatically (e.g. `tree-pose` → `tree_pose`, `pushup
 
 - Node 18+
 - `REACT_APP_API_URL` in `frontend/.env` pointing at the backend (e.g. `http://localhost:8000`).
+
+## Sign up / Sign in (404)
+
+If you see **"Sign up failed (404)"** or **"This site can't be reached"** when creating an account or signing in, the frontend is not talking to the backend. Do both:
+
+1. **Backend must be running:** `cd backend && python manage.py migrate && python manage.py runserver 8000`
+2. **Frontend must use backend URL:** `frontend/.env` must contain `REACT_APP_API_URL=http://localhost:8000` (then restart the frontend with `npm start`).
