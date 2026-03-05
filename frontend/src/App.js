@@ -4,6 +4,7 @@ import SignIn from "./components/SignIn";
 import SignUp from "./components/SignUp";
 import ExerciseLanding from "./components/ExerciseLanding";
 import ExercisePage from "./components/ExercisePage";
+import ProfilePage from "./components/ProfilePage";
 
 export default function App() {
   const [route, setRoute] = useState("signin");
@@ -16,7 +17,6 @@ export default function App() {
         setRoute("exercise");
         setExerciseSlug(h.replace("exercise-", ""));
       } else {
-        // default landing is signin now
         setRoute(h || "signin");
         setExerciseSlug(null);
       }
@@ -37,10 +37,9 @@ export default function App() {
     window.location.hash = to;
   }
 
-  const isDashboardLayout = route === "dashboard" || route === "exercise";
+  const isDashboardLayout = route === "dashboard" || route === "exercise" || route === "profile";
   const isAuthPage = route === "signin" || route === "signup";
 
-  // Auth pages manage their own full-screen background — no wrapper needed
   if (isAuthPage) {
     return (
       <>
@@ -56,6 +55,7 @@ export default function App() {
       {route === "exercise" && exerciseSlug && (
         <ExercisePage exerciseId={exerciseSlug} onNavigate={navigate} />
       )}
+      {route === "profile" && <ProfilePage onNavigate={navigate} />}
       {!isDashboardLayout && (
         <footer className="footer">© {new Date().getFullYear()} Pose Corrector AI</footer>
       )}
