@@ -1,3 +1,5 @@
+import React, { useState } from "react";
+
 const stats = [
   { label: "Total Workouts", value: 24, icon: "🏋️", color: "#6C63FF" },
   { label: "Streak", value: "7 days", icon: "🔥", color: "#FF6B6B" },
@@ -15,7 +17,18 @@ const recentWorkouts = [
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const weekActivity = [1, 0, 1, 1, 0, 1, 1];
 
-export default function ProfilePage() {
+export default function ProfilePage({ onNavigate }) {
+  const [editing, setEditing] = useState(false);
+  const [age, setAge] = useState("23");
+  const [height, setHeight] = useState("5'4\"");
+  const [weight, setWeight] = useState("130 lbs");
+
+  const profileFields = [
+    { label: "Age", value: age, setter: setAge },
+    { label: "Height", value: height, setter: setHeight },
+    { label: "Weight", value: weight, setter: setWeight },
+  ];
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -39,11 +52,35 @@ export default function ProfilePage() {
           <span style={{ fontWeight: 700, fontSize: 18 }}>Pose Corrector AI</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <button
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#9CA3AF",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+            onClick={() => {
+              if (onNavigate) onNavigate("dashboard");
+              else window.location.hash = "dashboard";
+            }}
+          >
+            ← Back to exercises
+          </button>
           <span style={{ opacity: 0.7, fontSize: 14 }}>👤 Silky</span>
-          <button style={{
-            background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
-            color: "#fff", borderRadius: 8, padding: "6px 16px", cursor: "pointer", fontSize: 13
-          }}>Sign out</button>
+          <button
+            style={{
+              background: "rgba(255,255,255,0.1)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              color: "#fff",
+              borderRadius: 8,
+              padding: "6px 16px",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            Sign out
+          </button>
         </div>
       </nav>
 
@@ -63,25 +100,63 @@ export default function ProfilePage() {
             fontSize: 28, fontWeight: 800
           }}>S</div>
           <div style={{ flex: 1 }}>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Silky Sindhani</h1>
-            <p style={{ margin: "4px 0 10px", opacity: 0.6, fontSize: 14 }}>silky@example.com · Member since Jan 2026</p>
+            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Silky</h1>
+            <p style={{ margin: "4px 0 10px", opacity: 0.6, fontSize: 14 }}>
+              silky@example.com · Member since Jan 2026
+            </p>
             <div style={{ display: "flex", gap: 12 }}>
-              {[["Age", "23"], ["Height", "5'4\""], ["Weight", "130 lbs"]].map(([k, v]) => (
-                <div key={k} style={{
-                  background: "rgba(255,255,255,0.08)", borderRadius: 8,
-                  padding: "4px 12px", fontSize: 13
-                }}>
-                  <span style={{ opacity: 0.6 }}>{k}: </span>
-                  <span style={{ fontWeight: 600 }}>{v}</span>
+              {profileFields.map((field) => (
+                <div
+                  key={field.label}
+                  style={{
+                    background: "rgba(255,255,255,0.08)",
+                    borderRadius: 8,
+                    padding: "4px 12px",
+                    fontSize: 13,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <span style={{ opacity: 0.6 }}>{field.label}:</span>
+                  {editing ? (
+                    <input
+                      type="text"
+                      value={field.value}
+                      onChange={(e) => field.setter(e.target.value)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        borderBottom: "1px solid rgba(255,255,255,0.35)",
+                        color: "#fff",
+                        fontSize: 13,
+                        padding: "2px 0",
+                        outline: "none",
+                        minWidth: 40,
+                      }}
+                    />
+                  ) : (
+                    <span style={{ fontWeight: 600 }}>{field.value}</span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
-          <button style={{
-            background: "linear-gradient(135deg, #6C63FF, #00C9A7)",
-            border: "none", color: "#fff", borderRadius: 10,
-            padding: "10px 20px", cursor: "pointer", fontWeight: 600, fontSize: 14
-          }}>Edit Profile</button>
+          <button
+            style={{
+              background: "linear-gradient(135deg, #6C63FF, #00C9A7)",
+              border: "none",
+              color: "#fff",
+              borderRadius: 10,
+              padding: "10px 20px",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+            onClick={() => setEditing((prev) => !prev)}
+          >
+            {editing ? "Save" : "Edit Profile"}
+          </button>
         </div>
 
         {/* Stats Row */}
