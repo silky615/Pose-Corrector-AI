@@ -36,6 +36,7 @@ from api.exercise_logic import (
     BICEP_IMPORTANT_LANDMARKS,
     PLANK_IMPORTANT_LANDMARKS,
     SQUAT_IMPORTANT_LANDMARKS,
+    TREE_POSE_IMPORTANT_LANDMARKS,
     POSE_LANDMARK_INDEX,
     KEY_LANDMARKS_FOR_ACCURACY,
     IDEAL_POSES,
@@ -192,6 +193,8 @@ def build_feature_row(ex_type: str, landmarks_json: list) -> np.ndarray:
         important = PLANK_IMPORTANT_LANDMARKS
     elif ex_type == "squat":
         important = SQUAT_IMPORTANT_LANDMARKS
+    elif ex_type == "tree_pose":
+        important = TREE_POSE_IMPORTANT_LANDMARKS
     else:
         # Fallback: use all landmarks as-is (33 * 4 = 132)
         row = []
@@ -695,9 +698,11 @@ TREE_POSE_HOLD_SECS  = 3  # seconds of correct hold = 1 rep
 def _ensure_tree_pose_state(client_key: str):
     if client_key not in _TREE_POSE_RT_STATE:
         _TREE_POSE_RT_STATE[client_key] = {
-            "hold_start": None,
+            "hold_start":  None,
             "rep_counted": False,
-            "counter": 0,
+            "counter":     0,
+            "timer_start": None,
+            "elapsed":     0.0,
         }
 
 def _ensure_wall_sit_state(client_key: str):
@@ -2378,216 +2383,98 @@ def stream_process(request):
 
         # Tree pose: rule-based + ideal-pose accuracy so user always sees a number
         if ex_type == "tree_pose":
-            tree_ideal = IDEAL_POSES.get("tree_pose", {}).get("hold")
-            try:
-                tree_acc_int = max(
-                    0, min(100, int(round(_accuracy_vs_ideal(landmarks, tree_ideal))))
-                ) if tree_ideal else 0
-            except (TypeError, KeyError, IndexError, AttributeError):
-                tree_acc_int = 0
-
-            mp_pose = get_mp_pose()
-            calculate_angle = get_calculate_angle()
-            if calculate_angle is None:
-                return Response(
-                    {
-                        "message": "Tree Pose: Pose analysis not available (angles missing).",
-                        "accuracy": 0,
-                        "posture_ok": False,
-                    }
-                )
-
-            VIS = 0.6
-
-            _def = {"x": 0.5, "y": 0.5, "visibility": 0.0}
-
-            if mp_pose is not None:
-                def lm(name: str):
-                    i = mp_pose.PoseLandmark[name].value
-                    if i >= len(landmarks):
-                        return _def.copy()
-                    p = landmarks[i]
-                    if p is None:
-                        return _def.copy()
-                    if isinstance(p, dict):
-                        return {"x": p.get("x", 0.5), "y": p.get("y", 0.5), "visibility": p.get("visibility", 0.0)}
-                    return {"x": getattr(p, "x", 0.5), "y": getattr(p, "y", 0.5), "visibility": getattr(p, "visibility", 0.0)}
-            else:
-                def lm(name: str):
-                    i = POSE_LANDMARK_INDEX.get(name)
-                    if i is None or i >= len(landmarks):
-                        return _def.copy()
-                    p = landmarks[i]
-                    if p is None:
-                        return _def.copy()
-                    if isinstance(p, dict):
-                        return {"x": p.get("x", 0.5), "y": p.get("y", 0.5), "visibility": p.get("visibility", 0.0)}
-                    return {"x": getattr(p, "x", 0.5), "y": getattr(p, "y", 0.5), "visibility": getattr(p, "visibility", 0.0)}
-
-            left_ankle = lm("LEFT_ANKLE")
-            right_ankle = lm("RIGHT_ANKLE")
-            left_knee = lm("LEFT_KNEE")
-            right_knee = lm("RIGHT_KNEE")
-            left_hip = lm("LEFT_HIP")
-            right_hip = lm("RIGHT_HIP")
-            left_shoulder = lm("LEFT_SHOULDER")
-            right_shoulder = lm("RIGHT_SHOULDER")
-
-            if min(
-                left_ankle.get("visibility", 0),
-                right_ankle.get("visibility", 0),
-                left_knee.get("visibility", 0),
-                right_knee.get("visibility", 0),
-                left_hip.get("visibility", 0),
-                right_hip.get("visibility", 0),
-            ) < VIS:
-                return Response(
-                    {
-                        "message": "Tree Pose: Step back so your full legs are visible.",
-                        "accuracy": 0,
-                        "posture_ok": False,
-                    }
-                )
-
-            # Choose standing leg as the one closer to the floor (larger y).
-            standing_side = "LEFT" if left_ankle["y"] > right_ankle["y"] else "RIGHT"
-            lifted_side = "RIGHT" if standing_side == "LEFT" else "LEFT"
-
-            if standing_side == "LEFT":
-                s_ankle, s_knee, s_hip, s_sh = left_ankle, left_knee, left_hip, left_shoulder
-                l_ankle, l_knee, l_hip = right_ankle, right_knee, right_hip
-            else:
-                s_ankle, s_knee, s_hip, s_sh = right_ankle, right_knee, right_hip, right_shoulder
-                l_ankle, l_knee, l_hip = left_ankle, left_knee, left_hip
-
-            # Angles for standing leg straightness and lifted leg bend
-            s_hip_pt = [s_hip["x"], s_hip["y"]]
-            s_knee_pt = [s_knee["x"], s_knee["y"]]
-            s_ankle_pt = [s_ankle["x"], s_ankle["y"]]
-            l_hip_pt = [l_hip["x"], l_hip["y"]]
-            l_knee_pt = [l_knee["x"], l_knee["y"]]
-            l_ankle_pt = [l_ankle["x"], l_ankle["y"]]
-            s_sh_pt = [s_sh["x"], s_sh["y"]]
-
-            standing_knee_angle = float(calculate_angle(s_hip_pt, s_knee_pt, s_ankle_pt))
-            lifted_knee_angle = float(calculate_angle(l_hip_pt, l_knee_pt, l_ankle_pt))
-
-            # Standing leg should be relatively straight.
-            standing_leg_straight = standing_knee_angle > 165.0
-
-            # Lifted leg should be clearly bent.
-            lifted_leg_bent = lifted_knee_angle < 150.0
-
-            # Lifted foot should be higher than standing ankle by a margin (y smaller).
-            foot_lift_height = s_ankle["y"] - l_ankle["y"]
-            foot_lifted = foot_lift_height > 0.12
-
-            # Lifted foot should be near the standing leg horizontally (inside of thigh/calf).
-            foot_side_proximity = abs(l_ankle["x"] - s_knee["x"])
-            foot_near_leg = foot_side_proximity < 0.18
-
-            # Torso vertical over standing leg: shoulder–hip–ankle nearly stacked in x.
-            torso_over_foot = (
-                abs(s_sh["x"] - s_hip["x"]) < 0.08 and abs(s_hip["x"] - s_ankle["x"]) < 0.08
-            )
-
-            # ── Arms check: wrists must be above shoulders ──────────────
-            left_wrist  = lm("LEFT_WRIST")
-            right_wrist = lm("RIGHT_WRIST")
-            avg_shoulder_y = (left_shoulder["y"] + right_shoulder["y"]) / 2
-            best_wrist_y   = min(left_wrist["y"], right_wrist["y"])
-            # In MediaPipe: smaller y = higher in frame
-            # Arms raised = at least one wrist above shoulder level
-            arms_raised = best_wrist_y < avg_shoulder_y - 0.05
-
-            # Coaching logic
-            if not foot_lifted or not lifted_leg_bent:
-                # Reset hold timer — pose broken
-                client_key = _get_client_key(request)
-                _ensure_tree_pose_state(client_key)
-                tp = _TREE_POSE_RT_STATE[client_key]
-                tp["hold_start"]  = None
-                tp["rep_counted"] = False
-                return Response(
-                    {
-                        "message": f"Tree Pose: Lift your {lifted_side.lower()} foot and place it on the inner leg of the standing leg.",
-                        "accuracy": 0,
-                        "posture_ok": False,
-                        "counter": tp["counter"],
-                    }
-                )
-
-            if not arms_raised:
-                client_key = _get_client_key(request)
-                _ensure_tree_pose_state(client_key)
-                tp = _TREE_POSE_RT_STATE[client_key]
-                tp["hold_start"]  = None
-                tp["rep_counted"] = False
-                return Response(
-                    {
-                        "message": "Tree Pose: Raise both arms above your head.",
-                        "accuracy": 50,
-                        "posture_ok": False,
-                        "counter": tp["counter"],
-                    }
-                )
-
-            if not foot_near_leg:
-                return Response(
-                    {
-                        "message": "Tree Pose: Bring the lifted foot closer to the inside of your standing leg.",
-                        "accuracy": 60,
-                        "posture_ok": False,
-                    }
-                )
-
-            if not torso_over_foot:
-                return Response(
-                    {
-                        "message": "Tree Pose: Keep your spine straight—stack shoulders over hips and over the standing foot.",
-                        "accuracy": 70,
-                        "posture_ok": False,
-                    }
-                )
-
-            if not standing_leg_straight:
-                return Response(
-                    {
-                        "message": "Tree Pose: Straighten the standing leg and keep it strong.",
-                        "accuracy": 80,
-                        "posture_ok": False,
-                    }
-                )
-
-            # All checks passed — run time-based hold counter
             client_key = _get_client_key(request)
             _ensure_tree_pose_state(client_key)
             tp = _TREE_POSE_RT_STATE[client_key]
 
+            def _timer_elapsed(tp, now_ts):
+                return tp["elapsed"] + (now_ts - tp["timer_start"]) if tp["timer_start"] else tp["elapsed"]
+
+            # Require 33 landmarks
+            if len(landmarks) < 33:
+                tp["timer_start"] = None
+                return Response({
+                    "message":    "Tree Pose: Step back so your full body is visible.",
+                    "accuracy":   0, "posture_ok": False,
+                    "timer": round(tp.get("elapsed", 0.0), 1), "timer_display": "00:00",
+                })
+
+            # ── Geometry gate: arms must be raised ───────────────────────────
+            def _gy(name):
+                i = POSE_LANDMARK_INDEX.get(name)
+                if i is None or i >= len(landmarks): return 0.5
+                p = landmarks[i]
+                if p is None: return 0.5
+                return p.get("y", 0.5) if isinstance(p, dict) else getattr(p, "y", 0.5)
+
+            l_wrist_y  = _gy("LEFT_WRIST");  r_wrist_y  = _gy("RIGHT_WRIST")
+            l_shldr_y  = _gy("LEFT_SHOULDER"); r_shldr_y = _gy("RIGHT_SHOULDER")
+            avg_shldr_y   = (l_shldr_y + r_shldr_y) / 2
+            best_wrist_y  = min(l_wrist_y, r_wrist_y)
+            arms_raised   = best_wrist_y < avg_shldr_y - 0.05
+
+            if not arms_raised:
+                if tp.get("timer_start") is not None:
+                    tp["elapsed"] = tp.get("elapsed", 0) + time.time() - tp["timer_start"]
+                    tp["timer_start"] = None
+                return Response({
+                    "message":    "Tree Pose: Raise both arms above your head.",
+                    "accuracy":   0, "posture_ok": False,
+                    "timer": round(tp.get("elapsed", 0.0), 1), "timer_display": "00:00",
+                })
+
+            # ── ML model ─────────────────────────────────────────────────────
+            posture_ok   = False
+            conf         = 0
+            feedback_msg = "Tree Pose: Stand on one leg and raise arms above your head."
+            try:
+                models   = get_models()
+                tp_data  = models.get("tree_pose", {})
+                ml_model = tp_data.get("model")
+                scaler   = tp_data.get("scaler")
+
+                if ml_model and scaler:
+                    row        = build_feature_row("tree_pose", landmarks)
+                    X          = scaler.transform(row.reshape(1, -1))
+                    pred       = ml_model.predict(X)[0]
+                    proba      = ml_model.predict_proba(X)[0]
+                    conf       = int(round(float(proba[0]) * 100))
+                    posture_ok = (int(pred) == 0)
+                    print(f"[TREE ML] pred={pred} conf={conf} posture_ok={posture_ok}")
+                    if not posture_ok:
+                        feedback_msg = "Tree Pose: Lift one foot, place it on your inner thigh."
+                else:
+                    feedback_msg = "Tree Pose: Model not loaded."
+            except Exception as e:
+                print(f"[TREE] ML error: {e}")
+                feedback_msg = "Tree Pose: Could not analyse pose."
+
+            # ── Timer ─────────────────────────────────────────────────────────
             now_ts = time.time()
-            if tp["hold_start"] is None:
-                tp["hold_start"] = now_ts
-                tp["rep_counted"] = False
-
-            elapsed   = now_ts - tp["hold_start"]
-            remaining = max(0.0, TREE_POSE_HOLD_SECS - elapsed)
-
-            if elapsed >= TREE_POSE_HOLD_SECS and not tp["rep_counted"]:
-                tp["counter"]    += 1
-                tp["rep_counted"] = True
-
-            if remaining > 0:
-                hold_msg = f"Tree Pose: Hold steady... {remaining:.1f}s remaining"
-                hold_acc = int(min(99, 50 + (elapsed / TREE_POSE_HOLD_SECS) * 49))
+            if posture_ok:
+                if tp.get("timer_start") is None:
+                    tp["timer_start"] = now_ts
+                total_elapsed = _timer_elapsed(tp, now_ts)
+                mins  = int(total_elapsed) // 60
+                secs  = int(total_elapsed) % 60
+                msg   = f"Tree Pose: Great! Hold steady — {mins:02d}:{secs:02d}"
+                acc   = conf
             else:
-                hold_msg = "Tree Pose: Rep complete! Lower your foot and go again."
-                hold_acc = 100
+                if tp.get("timer_start") is not None:
+                    tp["elapsed"] = tp.get("elapsed", 0) + now_ts - tp["timer_start"]
+                    tp["timer_start"] = None
+                total_elapsed = tp.get("elapsed", 0)
+                mins  = int(total_elapsed) // 60
+                secs  = int(total_elapsed) % 60
+                msg   = feedback_msg
+                acc   = 0
 
             return Response({
-                "message":    hold_msg,
-                "accuracy":   hold_acc,
-                "posture_ok": True,
-                "counter":    tp["counter"],
+                "message":       msg,
+                "accuracy":      acc,
+                "posture_ok":    posture_ok,
+                "timer":         round(_timer_elapsed(tp, now_ts) if posture_ok and tp.get("timer_start") else tp.get("elapsed", 0), 1),
+                "timer_display": f"{mins:02d}:{secs:02d}",
             })
 
         # Fallback for squat or any other type

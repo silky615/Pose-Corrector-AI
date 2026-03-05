@@ -15,6 +15,7 @@ Constants and helpers below are used by api.views. Import them in views with:
       BICEP_IMPORTANT_LANDMARKS,
       PLANK_IMPORTANT_LANDMARKS,
       SQUAT_IMPORTANT_LANDMARKS,
+      TREE_POSE_IMPORTANT_LANDMARKS,
       IDEAL_POSES,
       KEY_LANDMARKS_FOR_ACCURACY,
       build_feature_row,
@@ -49,6 +50,17 @@ PLANK_IMPORTANT_LANDMARKS = [
 SQUAT_IMPORTANT_LANDMARKS = [
     "NOSE", "LEFT_SHOULDER", "RIGHT_SHOULDER", "LEFT_HIP", "RIGHT_HIP",
     "LEFT_KNEE", "RIGHT_KNEE", "LEFT_ANKLE", "RIGHT_ANKLE",
+]
+
+# Tree pose: 13 key landmarks (52 features) — same philosophy as bicep curl
+TREE_POSE_IMPORTANT_LANDMARKS = [
+    "NOSE",
+    "LEFT_SHOULDER",  "RIGHT_SHOULDER",
+    "LEFT_ELBOW",     "RIGHT_ELBOW",
+    "LEFT_WRIST",     "RIGHT_WRIST",
+    "LEFT_HIP",       "RIGHT_HIP",
+    "LEFT_KNEE",      "RIGHT_KNEE",
+    "LEFT_ANKLE",     "RIGHT_ANKLE",
 ]
 
 # MediaPipe Pose landmark indices (use when mediapipe package is not loaded)
