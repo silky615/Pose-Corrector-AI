@@ -8,19 +8,15 @@ const POSE_MODEL_URL =
 function landmarksFromPoseResult(result) {
   if (!result?.landmarks?.[0]) return null;
   return result.landmarks[0].map((lm) => ({
-    x: lm.x,
-    y: lm.y,
-    z: lm.z ?? 0,
-    visibility: lm.visibility ?? 1,
+    x: lm.x, y: lm.y, z: lm.z ?? 0, visibility: lm.visibility ?? 1,
   }));
 }
 
-// MediaPipe Pose landmark connections (skeleton lines) – body only, no face
 const POSE_CONNECTIONS = [
-  [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], // shoulders, arms
-  [23, 24], [11, 23], [12, 24],                      // hips, torso
-  [23, 25], [25, 27], [24, 26], [26, 28],            // legs
-  [27, 29], [29, 31], [28, 30], [30, 32],            // feet
+  [11,12],[11,13],[13,15],[12,14],[14,16],
+  [23,24],[11,23],[12,24],
+  [23,25],[25,27],[24,26],[26,28],
+  [27,29],[29,31],[28,30],[30,32],
 ];
 
 function drawPoseOnCanvas(canvas, video, landmarks, postureOk) {
@@ -28,43 +24,36 @@ function drawPoseOnCanvas(canvas, video, landmarks, postureOk) {
   const w = video.videoWidth;
   const h = video.videoHeight;
   if (!w || !h) return;
-  if (canvas.width !== w || canvas.height !== h) {
-    canvas.width = w;
-    canvas.height = h;
-  }
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, w, h);
-  const color =
-    postureOk === true ? "#22c55e" : postureOk === false ? "#ef4444" : "rgba(150,150,150,0.8)";
+  const color = postureOk === true ? "#22c55e" : postureOk === false ? "#ef4444" : "rgba(150,150,150,0.8)";
   const lineWidth = Math.max(2, Math.min(4, w / 160));
   const radius = Math.max(3, Math.min(6, w / 120));
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = lineWidth;
-  ctx.lineCap = "round";
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lineWidth; ctx.lineCap = "round";
   for (const [i, j] of POSE_CONNECTIONS) {
     if (i >= landmarks.length || j >= landmarks.length) continue;
-    const a = landmarks[i];
-    const b = landmarks[j];
+    const a = landmarks[i]; const b = landmarks[j];
     if (!a || !b || (a.visibility !== undefined && a.visibility < 0.3) || (b.visibility !== undefined && b.visibility < 0.3)) continue;
-    ctx.beginPath();
-    ctx.moveTo(a.x * w, a.y * h);
-    ctx.lineTo(b.x * w, b.y * h);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(a.x * w, a.y * h); ctx.lineTo(b.x * w, b.y * h); ctx.stroke();
   }
   for (let i = 0; i < landmarks.length; i++) {
-    if (i <= 10) continue; // skip face landmarks (0=nose, 1-10=eyes, ears, mouth)
+    if (i <= 10) continue;
     const lm = landmarks[i];
     if (!lm || (lm.visibility !== undefined && lm.visibility < 0.3)) continue;
-    ctx.beginPath();
-    ctx.arc(lm.x * w, lm.y * h, radius, 0, 2 * Math.PI);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(lm.x * w, lm.y * h, radius, 0, 2 * Math.PI); ctx.fill();
   }
 }
 
+const difficultyStyle = {
+  Beginner:     { bg: "rgba(34,197,94,0.15)",  border: "rgba(34,197,94,0.4)",  text: "#4ade80" },
+  Intermediate: { bg: "rgba(245,158,11,0.15)", border: "rgba(245,158,11,0.4)", text: "#fbbf24" },
+  Advanced:     { bg: "rgba(239,68,68,0.15)",  border: "rgba(239,68,68,0.4)",  text: "#f87171" },
+};
+
 export default function ExercisePage({ exerciseId, onNavigate }) {
   const exercise = getExerciseById(exerciseId);
-  const [mode, setMode] = useState(null); // "live" | "upload"
+  const [mode, setMode] = useState(null);
   const [stream, setStream] = useState(null);
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadExerciseId, setUploadExerciseId] = useState("");
@@ -74,7 +63,6 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   const [uploadResult, setUploadResult] = useState(null);
   const [liveFeedback, setLiveFeedback] = useState(null);
   const [liveError, setLiveError] = useState("");
-  const [liveExerciseId, setLiveExerciseId] = useState(exerciseId);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const poseRef = useRef(null);
@@ -107,166 +95,102 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
       })
       .catch((err) => {
         console.error(err);
-        setUploadError("Could not access camera. Please allow camera permission.");
+        setLiveError("Could not access camera. Please allow camera permission.");
+        setAnalyzing(false);
       });
-    return () => {
-      if (s) s.getTracks().forEach((t) => t.stop());
-    };
+    return () => { if (s) s.getTracks().forEach((t) => t.stop()); };
   }, [mode]);
 
-  // Live: run MediaPipe Pose and send landmarks to backend
   useEffect(() => {
-    if (mode !== "live" || !stream || !videoRef.current) return;
+    if (mode !== "live" || !stream) return;
     let cancelled = false;
-
-    async function runPoseLoop() {
+    async function loadPose() {
       try {
-        const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
-        const vision = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+        const vision = await window.FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
         );
-        const landmarker = await PoseLandmarker.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: POSE_MODEL_URL },
-          runningMode: "VIDEO",
-          numPoses: 1,
+        poseRef.current = await window.PoseLandmarker.createFromOptions(vision, {
+          baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: "GPU" },
+          runningMode: "VIDEO", numPoses: 1,
         });
-        if (cancelled) return;
-        poseRef.current = landmarker;
-
-        function tick() {
-          if (cancelled) return;
-          const video = videoRef.current;
-          if (!video || video.readyState < 2) {
-            rafRef.current = requestAnimationFrame(tick);
-            return;
-          }
-          const now = performance.now();
-          if (now - lastSendRef.current < 100) {
-            rafRef.current = requestAnimationFrame(tick);
-            return;
-          }
-          lastSendRef.current = now;
-          const tsMs = Math.round(now);
-          try {
-            const result = landmarker.detectForVideo(video, tsMs);
-            const landmarks = landmarksFromPoseResult(result);
-            if (landmarks && landmarks.length >= 33) {
-              landmarksRef.current = landmarks;
-              drawPoseOnCanvas(
-                canvasRef.current,
-                video,
-                landmarks,
-                postureOkRef.current
-              );
-              api
-                .streamAnalysis(liveExerciseId, landmarks, false)
-                .then((data) => {
-                  if (!cancelled) {
-                    postureOkRef.current = data.posture_ok;
-                    setLiveFeedback(data);
-                  }
-                })
-                .catch(() => {
-                  if (!cancelled) setLiveError("Backend unavailable. Is the server running?");
-                });
-            } else {
-              landmarksRef.current = null;
-              if (canvasRef.current) {
-                const ctx = canvasRef.current.getContext("2d");
-                if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-              }
-              setLiveFeedback({ message: "Show your full body in frame…", accuracy: 0 });
-            }
-          } catch (_) {
-            // ignore frame errors
-          }
-          rafRef.current = requestAnimationFrame(tick);
-        }
-        rafRef.current = requestAnimationFrame(tick);
-      } catch (err) {
-        console.error(err);
-        if (!cancelled) setLiveError("Could not load pose model. Check your connection.");
+        setAnalyzing(false);
+      } catch (e) {
+        console.error("Pose model load error:", e);
+        setLiveError("Could not load pose model. Check your connection.");
       }
+    }
+    async function runPoseLoop() {
+      await loadPose();
+      function loop(ts) {
+        if (cancelled) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (video && video.readyState >= 2 && poseRef.current) {
+          try {
+            const result = poseRef.current.detectForVideo(video, ts);
+            const lms = landmarksFromPoseResult(result);
+            landmarksRef.current = lms;
+            drawPoseOnCanvas(canvas, video, lms, postureOkRef.current);
+            const now = Date.now();
+            if (lms && now - lastSendRef.current > 100) {
+              lastSendRef.current = now;
+              api.streamAnalysis(exerciseId, lms).then((data) => {
+                if (!cancelled) {
+                  setLiveFeedback(data);
+                  postureOkRef.current = data.posture_ok;
+                }
+              }).catch(() => {});
+            }
+          } catch (e) { console.error(e); }
+        }
+        rafRef.current = requestAnimationFrame(loop);
+      }
+      rafRef.current = requestAnimationFrame(loop);
     }
     runPoseLoop();
     return () => {
       cancelled = true;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [mode, stream, liveExerciseId]);
+  }, [mode, stream, exerciseId]);
 
   function handleSignOut() {
     if (stream) stream.getTracks().forEach((t) => t.stop());
     localStorage.removeItem("pc_demo_email");
     localStorage.removeItem("pc_demo_username");
     localStorage.removeItem("pc_demo_user_id");
-    onNavigate("index");
+    onNavigate("signin");
   }
 
   function handleBack() {
     if (stream) stream.getTracks().forEach((t) => t.stop());
-    setMode(null);
-    setStream(null);
-    setUploadFile(null);
-    setUploadError("");
-    setLiveError("");
-    setLiveFeedback(null);
-    setAnalyzing(false);
-    setUploadSuccess(false);
-    setUploadResult(null);
+    setMode(null); setStream(null); setUploadFile(null);
+    setUploadError(""); setLiveError(""); setLiveFeedback(null);
+    setAnalyzing(false); setUploadSuccess(false); setUploadResult(null);
     onNavigate("dashboard");
   }
 
   function handleLiveStart() {
-    setLiveExerciseId(exerciseId);
-    setMode("live");
-    setUploadError("");
-    setLiveError("");
-    setLiveFeedback(null);
-    setAnalyzing(true);
-  }
-
-  function handleLiveExerciseChange(newId) {
-    setLiveExerciseId(newId);
-    setLiveFeedback(null);
-    postureOkRef.current = undefined;
-    api.streamAnalysis(newId, [], true).then((data) => setLiveFeedback(data)).catch(() => {});
+    setMode("live"); setUploadError(""); setLiveError(""); setLiveFeedback(null); setAnalyzing(true);
   }
 
   function handleResetCounter() {
-    api.streamAnalysis(liveExerciseId, [], true).then((data) => setLiveFeedback(data)).catch(() => {});
+    api.streamAnalysis(exerciseId, [], true).then((data) => setLiveFeedback(data)).catch(() => {});
   }
 
   function handleUploadChange(e) {
     const file = e.target.files?.[0];
-    setUploadFile(file || null);
-    setUploadExerciseId("");
-    setUploadError("");
-    setUploadSuccess(false);
-    setUploadResult(null);
+    setUploadFile(file || null); setUploadExerciseId(""); setUploadError(""); setUploadSuccess(false); setUploadResult(null);
   }
 
   async function handleUploadSubmit() {
-    if (!uploadFile) {
-      setUploadError("Please select a video file.");
-      return;
-    }
-    if (!uploadExerciseId) {
-      setUploadError("Please select which exercise is shown in the video.");
-      return;
-    }
-    if (uploadExerciseId !== exerciseId) {
-      setUploadError(`Use the correct exercise. This page is for ${exercise.name} only.`);
-      return;
-    }
-    setUploadError("");
-    setUploadSuccess(false);
-    setUploadResult(null);
-    setAnalyzing(true);
+    if (!uploadFile) { setUploadError("Please select a video file."); return; }
+    if (!uploadExerciseId) { setUploadError("Please select which exercise is shown in the video."); return; }
+    if (uploadExerciseId !== exerciseId) { setUploadError(`Use the correct exercise. This page is for ${exercise.name} only.`); return; }
+    setUploadError(""); setUploadSuccess(false); setUploadResult(null); setAnalyzing(true);
     try {
       const result = await api.uploadVideo(uploadFile, exerciseId, userId || undefined);
-      setUploadResult(result);
-      setUploadSuccess(true);
+      setUploadResult(result); setUploadSuccess(true);
     } catch (err) {
       setUploadError(err.message || "Upload failed");
     } finally {
@@ -278,243 +202,213 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     return (
       <div className="dashboard-page">
         <p>Exercise not found.</p>
-        <button type="button" className="btn primary" onClick={() => onNavigate("dashboard")}>
-          Back to exercises
-        </button>
+        <button type="button" className="btn primary" onClick={() => onNavigate("dashboard")}>Back to exercises</button>
       </div>
     );
   }
 
   const welcomeName = displayName ? displayName.charAt(0).toUpperCase() + displayName.slice(1) : "Guest";
-  const youtubeUrl =
-    exercise.youtubeUrl ||
-    `https://www.youtube.com/results?search_query=${encodeURIComponent(
-      `${exercise.name} exercise tutorial`
-    )}`;
+  const youtubeUrl = exercise.youtubeUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(`${exercise.name} exercise tutorial`)}`;
+  const diff = difficultyStyle[exercise.difficulty] || difficultyStyle["Beginner"];
 
   return (
-    <div className="dashboard-page">
-      <header className="dashboard-topbar">
-        <div className="dashboard-brand">
-          <span className="dashboard-logo">PC</span>
-          <span className="dashboard-title">Pose Corrector AI</span>
+    <div style={{
+      minHeight: "100vh", width: "100%",
+      background: "radial-gradient(1200px 600px at 10% 20%, rgba(124,58,237,0.1), transparent), radial-gradient(800px 400px at 90% 80%, rgba(6,182,212,0.07), transparent), linear-gradient(180deg,#0f172a,#0b3140)",
+      fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+      color: "#e6f7f9", display: "flex", flexDirection: "column",
+    }}>
+
+      {/* TOPBAR */}
+      <header style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 32px", background:"rgba(15,23,42,0.85)", backdropFilter:"blur(12px)", borderBottom:"1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+          <div style={{ width:"40px", height:"40px", borderRadius:"10px", background:"linear-gradient(135deg,#7c3aed,#06b6d4)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"700", fontSize:"14px", color:"white", boxShadow:"0 4px 14px rgba(124,58,237,0.3)" }}>PC</div>
+          <span style={{ fontWeight:"600", fontSize:"16px", color:"#e6f7f9" }}>Pose Corrector AI</span>
         </div>
-        <div className="dashboard-user">
-          <span className="dashboard-username">👤 {welcomeName}</span>
-          <button type="button" className="btn ghost btn-signout" onClick={handleSignOut}>
-            Sign out
-          </button>
+        <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+          <span style={{ fontSize:"14px", color:"rgba(255,255,255,0.5)" }}>👤 {welcomeName}</span>
+          <button type="button" onClick={handleSignOut} style={{ background:"none", border:"1px solid rgba(255,255,255,0.1)", borderRadius:"8px", color:"rgba(255,255,255,0.6)", fontSize:"14px", padding:"7px 14px", cursor:"pointer" }}>Sign out</button>
         </div>
       </header>
 
-      <main className="exercise-page-main">
-        <button type="button" className="btn ghost back-link" onClick={handleBack}>
+      <main style={{ flex:1, maxWidth:"1100px", width:"100%", margin:"0 auto", padding:"32px 32px 64px", boxSizing:"border-box" }}>
+
+        {/* BACK */}
+        <button type="button" onClick={handleBack} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.4)", fontSize:"15px", cursor:"pointer", marginBottom:"24px", padding:0 }}>
           ← Back to exercises
         </button>
 
-        <h1 className="exercise-page-title">{exercise.name}</h1>
-        {exercise.description && (
-          <p className="exercise-page-description">{exercise.description}</p>
+        {/* TOP: image left, info right */}
+        {!mode && (
+          <>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"40px", marginBottom:"36px", alignItems:"start" }}>
+
+              {/* IMAGE */}
+              <div style={{ position:"relative", borderRadius:"18px", overflow:"hidden", border:"1px solid rgba(255,255,255,0.08)", background:"rgba(0,0,0,0.2)", aspectRatio:"4/3" }}>
+                <img
+                  src={exercise.imageUrl}
+                  alt={`${exercise.name} demo`}
+                  style={{ width:"100%", height:"100%", objectFit: (exercise.id === "squat" || exercise.id === "pushup") ? "cover" : "contain", objectPosition:"center", background: exercise.id === "lunges" ? "#fff" : "#000" }}
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                    e.target.nextElementSibling?.classList.remove("hidden");
+                  }}
+                />
+                <div className="exercise-image-fallback hidden">
+                  <span style={{ fontSize:"5rem" }}>{exercise.emoji}</span>
+                  <p style={{ color:"rgba(255,255,255,0.5)", margin:0 }}>{exercise.name}</p>
+                </div>
+              </div>
+
+              {/* INFO */}
+              <div style={{ display:"flex", flexDirection:"column", gap:"20px" }}>
+
+                {/* Title + difficulty */}
+                <div>
+                  <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"10px", flexWrap:"wrap" }}>
+                    <h1 style={{ margin:0, fontSize:"34px", fontWeight:"800", color:"white" }}>{exercise.name}</h1>
+                    {exercise.difficulty && (
+                      <span style={{ padding:"5px 16px", borderRadius:"20px", fontSize:"13px", fontWeight:"600", background: diff.bg, border:`1px solid ${diff.border}`, color: diff.text }}>
+                        {exercise.difficulty}
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin:0, fontSize:"16px", color:"rgba(255,255,255,0.5)", lineHeight:1.7 }}>{exercise.description}</p>
+                </div>
+
+                {/* Quick stats */}
+                {(exercise.sets || exercise.reps || exercise.calories) && (
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"12px" }}>
+                    {[
+                      { icon:"🔁", label:"Sets",     value: exercise.sets     },
+                      { icon:"⏱️", label:"Duration",  value: exercise.reps     },
+                      { icon:"🔥", label:"Calories",  value: exercise.calories },
+                    ].map((s, i) => (
+                      <div key={i} style={{ padding:"14px 10px", background:"rgba(255,255,255,0.05)", borderRadius:"12px", border:"1px solid rgba(255,255,255,0.07)", textAlign:"center" }}>
+                        <div style={{ fontSize:"20px", marginBottom:"6px" }}>{s.icon}</div>
+                        <div style={{ fontSize:"15px", fontWeight:"700", color:"white" }}>{s.value}</div>
+                        <div style={{ fontSize:"12px", color:"rgba(255,255,255,0.35)", marginTop:"2px" }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Muscles targeted */}
+                {exercise.muscles?.length > 0 && (
+                  <div>
+                    <p style={{ margin:"0 0 10px", fontSize:"13px", fontWeight:"600", color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"1px" }}>Muscles Targeted</p>
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
+                      {exercise.muscles.map((m, i) => (
+                        <span key={i} style={{ padding:"5px 14px", borderRadius:"20px", fontSize:"13px", background:"rgba(6,182,212,0.12)", border:"1px solid rgba(6,182,212,0.25)", color:"#67e8f9" }}>{m}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* YouTube */}
+                <a href={youtubeUrl} target="_blank" rel="noreferrer"
+                  style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"12px 20px", background:"rgba(255,0,0,0.12)", border:"1px solid rgba(255,0,0,0.3)", borderRadius:"10px", color:"#fca5a5", fontSize:"15px", fontWeight:"600", textDecoration:"none", width:"fit-content" }}>
+                  ▶ Watch YouTube Demo
+                </a>
+              </div>
+            </div>
+
+            {/* FORM CHECKLIST */}
+            {exercise.checklist?.length > 0 && (
+              <div style={{ marginBottom:"36px" }}>
+                <h2 style={{ margin:"0 0 16px", fontSize:"20px", fontWeight:"700", color:"white" }}>✅ Form Checklist</h2>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+                  {exercise.checklist.map((tip, i) => (
+                    <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:"12px", padding:"16px 18px", background:"rgba(34,197,94,0.06)", border:"1px solid rgba(34,197,94,0.15)", borderRadius:"12px" }}>
+                      <span style={{ fontSize:"16px", flexShrink:0, marginTop:"1px" }}>✅</span>
+                      <span style={{ fontSize:"14px", color:"rgba(255,255,255,0.75)", lineHeight:1.6 }}>{tip}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PRACTICE OPTIONS */}
+            <div>
+              <h2 style={{ margin:"0 0 16px", fontSize:"20px", fontWeight:"700", color:"white" }}>How do you want to practice?</h2>
+              <div className="exercise-option-cards">
+                <button type="button" className="exercise-option-card" onClick={handleLiveStart}>
+                  <span className="exercise-option-icon">📹</span>
+                  <span className="exercise-option-title">Live Workout</span>
+                  <span className="exercise-option-desc">Use your camera for real-time analysis</span>
+                </button>
+                <button type="button" className="exercise-option-card" onClick={() => setMode("upload")}>
+                  <span className="exercise-option-icon">📤</span>
+                  <span className="exercise-option-title">Upload a Video</span>
+                  <span className="exercise-option-desc">Upload a video of this exercise only</span>
+                </button>
+              </div>
+            </div>
+          </>
         )}
 
-        <div className="exercise-image-wrap">
-          <img
-            src={exercise.imageUrl}
-            alt={`${exercise.name} demo`}
-            className={`exercise-image${
-              exercise.id === "squat" || exercise.id === "pushup"
-                ? " exercise-image-cover"
-                : ""
-            }${exercise.id === "lunges" ? " exercise-image-light" : ""}`}
-            onError={(e) => {
-              e.target.style.display = "none";
-              e.target.nextElementSibling?.classList.remove("hidden");
-            }}
-          />
-          <div className="exercise-image-fallback hidden">
-            <span className="exercise-emoji-large" role="img" aria-label={exercise.name}>
-              {exercise.emoji}
-            </span>
-            <p className="muted">{exercise.name}</p>
-          </div>
-        </div>
-
-        <a
-          href={youtubeUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="btn outline exercise-youtube-link"
-        >
-          Watch a quick YouTube demo
-        </a>
-
-        {!mode ? (
-          <div className="exercise-options">
-            <p className="exercise-options-prompt">How do you want to practice?</p>
-            <div className="exercise-option-cards">
-              <button
-                type="button"
-                className="exercise-option-card"
-                onClick={handleLiveStart}
-              >
-                <span className="exercise-option-icon">📹</span>
-                <span className="exercise-option-title">Live workout</span>
-                <span className="exercise-option-desc">Use your camera for real-time analysis</span>
-              </button>
-              <button
-                type="button"
-                className="exercise-option-card"
-                onClick={() => setMode("upload")}
-              >
-                <span className="exercise-option-icon">📤</span>
-                <span className="exercise-option-title">Upload a video</span>
-                <span className="exercise-option-desc">Upload a video of this exercise only</span>
-              </button>
+        {/* LIVE MODE */}
+        {mode === "live" && (
+          <div className="exercise-live-wrap">
+            <button type="button" className="btn ghost back-link" onClick={() => { if (stream) stream.getTracks().forEach(t => t.stop()); setMode(null); setStream(null); setLiveFeedback(null); setAnalyzing(false); }}>
+              ← Back
+            </button>
+            <h2 style={{ margin:"0 0 16px", fontSize:"22px", fontWeight:"700", color:"white" }}>{exercise.name} — Live</h2>
+            {analyzing && <p className="exercise-analyzing">⏳ Starting camera & loading pose model…</p>}
+            {liveError && <p style={{ color:"#fca5a5" }}>{liveError}</p>}
+            <div className={`exercise-video-container${liveFeedback ? (liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect") : ""}`}>
+              <video ref={videoRef} className="exercise-video" autoPlay playsInline muted />
+              <canvas ref={canvasRef} className="exercise-pose-canvas" />
             </div>
-          </div>
-        ) : mode === "live" ? (
-          <div className="exercise-live-wrap exercise-live-wrap--big">
-            <p className="exercise-live-all-label">Live workout — all exercises</p>
-            <div className="exercise-live-pills">
-              {EXERCISES.map((ex) => (
-                <button
-                  key={ex.id}
-                  type="button"
-                  className={`exercise-live-pill ${liveExerciseId === ex.id ? "active" : ""}`}
-                  onClick={() => handleLiveExerciseChange(ex.id)}
-                >
-                  <span className="exercise-live-pill-emoji" role="img" aria-hidden="true">{ex.emoji}</span>
-                  <span className="exercise-live-pill-name">{ex.name}</span>
-                </button>
-              ))}
-            </div>
-            <div
-              className={`exercise-video-container exercise-video-container--big ${
-                liveFeedback && typeof liveFeedback.posture_ok === "boolean"
-                  ? liveFeedback.posture_ok
-                    ? "posture-correct"
-                    : "posture-incorrect"
-                  : ""
-              }`}
-            >
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="exercise-video"
-              />
-              <canvas
-                ref={canvasRef}
-                className="exercise-pose-canvas"
-                aria-hidden="true"
-              />
-            </div>
-            {analyzing && !liveFeedback && (
-              <p className="exercise-analyzing">Connecting to AI… Show your full body.</p>
-            )}
             {liveFeedback && (
-              <div
-                className={`exercise-feedback exercise-feedback--big ${
-                  typeof liveFeedback.posture_ok === "boolean"
-                    ? liveFeedback.posture_ok
-                      ? "posture-correct"
-                      : "posture-incorrect"
-                    : ""
-                }`}
-              >
-                <p className="exercise-feedback-message">{liveFeedback.message}</p>
-                {typeof liveFeedback.accuracy === "number" && (
-                  <p className="exercise-feedback-accuracy">Accuracy: {liveFeedback.accuracy}%</p>
-                )}
-                {typeof liveFeedback.counter === "number" && (
-                  <p className="exercise-feedback-counter">Reps: {liveFeedback.counter}</p>
+              <div className={`exercise-feedback${liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect"}`}>
+                <p className="exercise-feedback-message">{liveFeedback.message || (liveFeedback.posture_ok ? "✅ Good form!" : "⚠️ Adjust your form")}</p>
+                {liveFeedback.accuracy != null && <p className="exercise-feedback-accuracy">Accuracy: {Math.round(liveFeedback.accuracy)}%</p>}
+                {liveFeedback.counter != null && (
+                  <p className="exercise-feedback-counter">
+                    Reps: {liveFeedback.counter}
+                    <button type="button" className="btn ghost" onClick={handleResetCounter} style={{ marginLeft:"12px", fontSize:"12px", padding:"3px 10px", minWidth:"auto" }}>Reset</button>
+                  </p>
                 )}
               </div>
             )}
-            {liveError && <div className="error">{liveError}</div>}
-            {uploadError && <div className="error">{uploadError}</div>}
-            <div className="exercise-live-actions">
-              <button type="button" className="btn outline" onClick={handleResetCounter}>
-                Reset rep count
-              </button>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => {
-                  if (stream) stream.getTracks().forEach((t) => t.stop());
-                  setStream(null);
-                  setMode(null);
-                  setAnalyzing(false);
-                  setLiveFeedback(null);
-                }}
-              >
-                Stop camera
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="exercise-upload-wrap">
-            <label className="exercise-upload-label">
-              Select video file
-              <input
-                type="file"
-                accept="video/*"
-                onChange={handleUploadChange}
-                className="exercise-upload-input"
-              />
-            </label>
-            {uploadFile && (
-              <>
-                <p className="muted small">Which exercise is shown in this video?</p>
-                <select
-                  value={uploadExerciseId}
-                  onChange={(e) => setUploadExerciseId(e.target.value)}
-                  className="exercise-select"
-                >
-                  <option value="">Select exercise…</option>
-                  {EXERCISES.map((ex) => (
-                    <option key={ex.id} value={ex.id}>{ex.name}</option>
-                  ))}
-                </select>
-                {uploadError && <div className="error">{uploadError}</div>}
-                <button
-                  type="button"
-                  className="btn primary"
-                  onClick={handleUploadSubmit}
-                  disabled={analyzing}
-                >
-                  {analyzing ? "Analyzing…" : "Analyze video"}
-                </button>
-                {uploadSuccess && uploadResult && (
-                  <div className="exercise-upload-result">
-                    <p className="exercise-upload-success">{uploadResult.message}</p>
-                    <p className="muted">Accuracy: {uploadResult.accuracy}%</p>
-                    {uploadResult.posture_ok !== undefined && (
-                      <p className="muted">Form: {uploadResult.posture_ok ? "Good" : "Needs work"}</p>
-                    )}
-                    {typeof uploadResult.counter === "number" && (
-                      <p className="muted">Reps: {uploadResult.counter}</p>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={() => {
-                setMode(null);
-                setUploadFile(null);
-                setUploadError("");
-                setUploadSuccess(false);
-                setUploadResult(null);
-              }}
-            >
-              Cancel
-            </button>
           </div>
         )}
+
+        {/* UPLOAD MODE */}
+        {mode === "upload" && (
+          <div className="exercise-upload-wrap">
+            <button type="button" className="btn ghost back-link" onClick={() => { setMode(null); setUploadFile(null); setUploadError(""); setUploadSuccess(false); setUploadResult(null); }}>
+              ← Back
+            </button>
+            <h2 style={{ margin:"0 0 16px", fontSize:"22px", fontWeight:"700", color:"white" }}>{exercise.name} — Upload Video</h2>
+            <label className="exercise-upload-label">
+              Select video file:
+              <input type="file" accept="video/*" onChange={handleUploadChange} className="exercise-upload-input" />
+            </label>
+            <label style={{ display:"flex", flexDirection:"column", gap:"6px", fontSize:"14px", color:"#eaf6f8" }}>
+              Confirm exercise in video:
+              <select value={uploadExerciseId} onChange={e => setUploadExerciseId(e.target.value)} className="exercise-select">
+                <option value="">— Select exercise —</option>
+                {EXERCISES.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+              </select>
+            </label>
+            {uploadError && <p style={{ color:"#fca5a5", margin:0 }}>⚠️ {uploadError}</p>}
+            {analyzing && <p className="exercise-analyzing">⏳ Analysing video…</p>}
+            {uploadSuccess && uploadResult && (
+              <div style={{ background:"rgba(6,182,212,0.08)", border:"1px solid rgba(6,182,212,0.2)", borderRadius:"12px", padding:"16px", fontSize:"14px" }}>
+                <p className="exercise-upload-success">✅ Analysis complete!</p>
+                {uploadResult.total_reps != null && <p className="muted small">Reps detected: {uploadResult.total_reps}</p>}
+                {uploadResult.avg_accuracy != null && <p className="muted small">Avg accuracy: {Math.round(uploadResult.avg_accuracy)}%</p>}
+                {uploadResult.feedback && <p className="muted small">{uploadResult.feedback}</p>}
+              </div>
+            )}
+            {!analyzing && !uploadSuccess && (
+              <button type="button" className="btn primary" onClick={handleUploadSubmit}>Analyse Video</button>
+            )}
+          </div>
+        )}
+
       </main>
     </div>
   );

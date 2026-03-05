@@ -1,5 +1,5 @@
-// Shared exercise list. Images in public folder (paths from root).
 const publicUrl = process.env.PUBLIC_URL || "";
+
 export const EXERCISES = [
   {
     id: "tree-pose",
@@ -9,6 +9,17 @@ export const EXERCISES = [
     imageUrl: `${publicUrl}/tree.jpeg`,
     description: "A standing yoga pose that improves balance, focus, and ankle stability.",
     youtubeUrl: "https://youtu.be/_u3NOB8pZf8?si=QZ3i70fQrfC3hd8G",
+    difficulty: "Beginner",
+    muscles: ["Core", "Ankles", "Glutes", "Hip Flexors"],
+    sets: "3 sets",
+    reps: "30–60 sec hold",
+    calories: "~4 kcal/min",
+    checklist: [
+      "Stand tall — keep your spine straight and shoulders relaxed",
+      "Press your foot firmly into your inner thigh or calf (not knee)",
+      "Fix your gaze on a still point directly in front of you",
+      "Keep your hips level and facing forward",
+    ],
   },
   {
     id: "plank",
@@ -18,6 +29,17 @@ export const EXERCISES = [
     imageUrl: `${publicUrl}/Plank.jpg`,
     description: "A core-strength move that engages your abs, shoulders, and glutes in one hold.",
     youtubeUrl: "https://youtu.be/pvIjsG5Svck?si=1I7FvBx39s8vJ1Bn",
+    difficulty: "Beginner",
+    muscles: ["Abs", "Shoulders", "Glutes", "Lower Back"],
+    sets: "3 sets",
+    reps: "20–60 sec hold",
+    calories: "~5 kcal/min",
+    checklist: [
+      "Keep your body in a straight line from head to heels",
+      "Engage your core — don't let your hips sag or rise",
+      "Look down at the floor to keep your neck neutral",
+      "Breathe steadily throughout the hold",
+    ],
   },
   {
     id: "bicep-curl",
@@ -27,6 +49,17 @@ export const EXERCISES = [
     imageUrl: `${publicUrl}/BIC2.jpeg`,
     description: "Targets the front of your upper arms with controlled curling of the weights.",
     youtubeUrl: "https://youtu.be/cBSD6mQIPQk?si=QLC1LmQVTWOWOefB",
+    difficulty: "Beginner",
+    muscles: ["Biceps", "Forearms", "Shoulders"],
+    sets: "3 sets",
+    reps: "10–15 reps",
+    calories: "~6 kcal/min",
+    checklist: [
+      "Keep your elbows tucked close to your sides",
+      "Curl slowly and squeeze at the top for 1 second",
+      "Lower the weight with control — don't drop it",
+      "Keep your back straight, avoid swinging",
+    ],
   },
   {
     id: "squat",
@@ -36,6 +69,17 @@ export const EXERCISES = [
     imageUrl: `${publicUrl}/Squat.jpg`,
     description: "A fundamental lower-body move that works your quads, glutes, and core.",
     youtubeUrl: "https://youtu.be/xqvCmoLULNY?si=NmXOMObwcGDcLSwL",
+    difficulty: "Beginner",
+    muscles: ["Quads", "Glutes", "Hamstrings", "Core"],
+    sets: "3 sets",
+    reps: "12–15 reps",
+    calories: "~8 kcal/min",
+    checklist: [
+      "Keep your feet shoulder-width apart, toes slightly out",
+      "Push your knees out in line with your toes",
+      "Keep your chest up and back straight throughout",
+      "Lower until thighs are parallel to the floor",
+    ],
   },
   {
     id: "pushup",
@@ -45,6 +89,17 @@ export const EXERCISES = [
     imageUrl: `${publicUrl}/pushup.jpg`,
     description: "Classic bodyweight press that trains chest, shoulders, and triceps.",
     youtubeUrl: "https://youtu.be/lsRAK6cr5kY?si=tbTxhh4WDFBTXNOK",
+    difficulty: "Intermediate",
+    muscles: ["Chest", "Triceps", "Shoulders", "Core"],
+    sets: "3 sets",
+    reps: "10–20 reps",
+    calories: "~7 kcal/min",
+    checklist: [
+      "Place hands slightly wider than shoulder-width apart",
+      "Keep your body in a straight line — no sagging hips",
+      "Lower your chest until it nearly touches the floor",
+      "Exhale as you push back up to the starting position",
+    ],
   },
   {
     id: "lunges",
@@ -54,6 +109,17 @@ export const EXERCISES = [
     imageUrl: `${publicUrl}/Lunge.png`,
     description: "Alternating step exercise that builds single-leg strength and balance.",
     youtubeUrl: "https://youtu.be/9gglI77Kzq8?si=1rpluCADtCTs7woL",
+    difficulty: "Beginner",
+    muscles: ["Quads", "Glutes", "Hamstrings", "Calves"],
+    sets: "3 sets",
+    reps: "10–12 reps each leg",
+    calories: "~7 kcal/min",
+    checklist: [
+      "Step forward far enough so your knee stays behind your toes",
+      "Lower your back knee toward (not onto) the floor",
+      "Keep your torso upright and core engaged",
+      "Push through your front heel to return to standing",
+    ],
   },
 ];
 
