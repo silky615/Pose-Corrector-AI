@@ -2,16 +2,16 @@ import React, { useState } from "react";
 import * as api from "../api";
 
 const inputStyle = {
-  width: "100%", padding: "12px 14px",
+  width: "100%", padding: "14px 16px",
   background: "rgba(255,255,255,0.05)",
   border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: "10px", color: "white", fontSize: "14px",
+  borderRadius: "12px", color: "white", fontSize: "16px",
   outline: "none", boxSizing: "border-box",
 };
 
 const labelStyle = {
-  display: "flex", flexDirection: "column", gap: "6px",
-  fontSize: "13px", fontWeight: "600", color: "rgba(255,255,255,0.7)",
+  display: "flex", flexDirection: "column", gap: "8px",
+  fontSize: "15px", fontWeight: "600", color: "rgba(255,255,255,0.7)",
 };
 
 export default function SignUp({ onNavigate }) {
@@ -79,34 +79,36 @@ export default function SignUp({ onNavigate }) {
     }}>
 
       <div style={{
-        width: "100%", maxWidth: "580px",
+        width: "100%", maxWidth: "620px",
         background: "rgba(11,18,33,0.95)",
-        borderRadius: "20px",
+        borderRadius: "22px",
         border: "1px solid rgba(255,255,255,0.07)",
         boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
-        padding: "48px", boxSizing: "border-box",
+        padding: "52px", boxSizing: "border-box",
       }}>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "32px" }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "36px" }}>
           <div style={{
-            width: "52px", height: "52px", borderRadius: "12px",
+            width: "60px", height: "60px", borderRadius: "14px",
             background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontWeight: "800", fontSize: "17px", color: "white", flexShrink: 0,
+            fontWeight: "800", fontSize: "20px", color: "white", flexShrink: 0,
             boxShadow: "0 6px 20px rgba(124,58,237,0.4)",
           }}>PC</div>
           <div>
-            <h2 style={{ margin: 0, fontSize: "22px", fontWeight: "700", color: "white" }}>Create Account 🚀</h2>
-            <p style={{ margin: "3px 0 0", fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>
+            <h2 style={{ margin: 0, fontSize: "26px", fontWeight: "700", color: "white" }}>Create Account 🚀</h2>
+            <p style={{ margin: "4px 0 0", fontSize: "15px", color: "rgba(255,255,255,0.4)" }}>
               Fill in your details to get started — it's free!
             </p>
           </div>
         </div>
 
-        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
 
+            {/* Full Name */}
             <div style={{ ...labelStyle, gridColumn: "1 / -1" }}>
               Full Name
               <input type="text" value={form.fullname} onChange={e => update("fullname", e.target.value)}
@@ -115,6 +117,7 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
             </div>
 
+            {/* Email */}
             <div style={{ ...labelStyle, gridColumn: "1 / -1" }}>
               Email Address
               <input type="email" value={form.email} onChange={e => update("email", e.target.value)}
@@ -123,6 +126,7 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
             </div>
 
+            {/* Age */}
             <div style={labelStyle}>
               Age
               <input type="number" value={form.age} onChange={e => update("age", e.target.value)}
@@ -131,6 +135,7 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
             </div>
 
+            {/* Height */}
             <div style={labelStyle}>
               Height (cm)
               <input type="number" value={form.height} onChange={e => update("height", e.target.value)}
@@ -139,6 +144,7 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
             </div>
 
+            {/* Weight */}
             <div style={labelStyle}>
               Weight (kg)
               <input type="number" value={form.weight} onChange={e => update("weight", e.target.value)}
@@ -147,45 +153,51 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
             </div>
 
+            {/* Password */}
             <div style={labelStyle}>
               Password
               <div style={{ position: "relative" }}>
                 <input type={showPassword ? "text" : "password"} value={form.password}
                   onChange={e => update("password", e.target.value)}
                   placeholder="Min 6 characters"
-                  style={{ ...inputStyle, paddingRight: "44px" }}
+                  style={{ ...inputStyle, paddingRight: "50px" }}
                   onFocus={e => e.target.style.borderColor = '#7c3aed'}
                   onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
                 <button type="button" onClick={() => setShowPassword(v => !v)} style={{
-                  position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)",
-                  background: "none", border: "none", cursor: "pointer", fontSize: "15px",
+                  position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer", fontSize: "20px",
                 }}>{showPassword ? "🙈" : "👁️"}</button>
               </div>
             </div>
 
           </div>
 
-          <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>
+          {/* Password hint */}
+          <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.3)" }}>
             🔒 Password must be at least 6 characters
           </p>
 
+          {/* Error */}
           {error && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 14px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "10px", color: "#fca5a5", fontSize: "13px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 16px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "12px", color: "#fca5a5", fontSize: "15px" }}>
               ⚠️ {error}
             </div>
           )}
 
-          <button type="submit" disabled={isLoading} style={{ width: "100%", padding: "15px", background: "linear-gradient(135deg, #7c3aed, #06b6d4)", border: "none", borderRadius: "12px", color: "white", fontSize: "15px", fontWeight: "700", cursor: "pointer", opacity: isLoading ? 0.7 : 1, marginTop: "4px" }}>
+          {/* Submit */}
+          <button type="submit" disabled={isLoading} style={{ width: "100%", padding: "17px", background: "linear-gradient(135deg, #7c3aed, #06b6d4)", border: "none", borderRadius: "12px", color: "white", fontSize: "18px", fontWeight: "700", cursor: "pointer", opacity: isLoading ? 0.7 : 1, marginTop: "4px" }}>
             {isLoading ? "Creating account..." : "Create Account 🚀"}
           </button>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {/* Divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
             <span style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.07)" }} />
-            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.25)" }}>Already have an account?</span>
+            <span style={{ fontSize: "14px", color: "rgba(255,255,255,0.25)" }}>Already have an account?</span>
             <span style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.07)" }} />
           </div>
 
-          <button type="button" onClick={() => onNavigate("signin")} style={{ width: "100%", padding: "13px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "rgba(255,255,255,0.75)", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}>
+          {/* Sign in */}
+          <button type="button" onClick={() => onNavigate("signin")} style={{ width: "100%", padding: "15px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "rgba(255,255,255,0.75)", fontSize: "17px", fontWeight: "600", cursor: "pointer" }}>
             Sign In Instead
           </button>
 
