@@ -198,7 +198,7 @@ export default function ProfilePage({ onNavigate }) {
                         <span style={{ fontSize: 22 }}>{EXERCISE_ICONS[w.exercise_type] || "🏋️"}</span>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: 14, textTransform: "capitalize" }}>{(w.exercise_type || "").replace(/_/g, " ")}</div>
-                          <div style={{ fontSize: 12, opacity: 0.5 }}>{w.date} · {w.reps} reps</div>
+                          <div style={{ fontSize: 12, opacity: 0.5 }}>{w.date} · {w.exercise_type === "plank" ? `${w.reps}s` : `${w.reps} reps`}</div>
                         </div>
                         <div style={{
                           background: w.accuracy >= 90 ? "rgba(6,182,212,0.15)" : "rgba(124,58,237,0.15)",

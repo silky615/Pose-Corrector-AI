@@ -1127,11 +1127,11 @@ def stream_process(request):
                 shoulder_y = (_get_y(11) + _get_y(12)) / 2
                 hip_y = (_get_y(23) + _get_y(24)) / 2
                 # Hips too low => hip is significantly below shoulders (y much larger)
-                if hip_y - shoulder_y > 0.12:
+                if hip_y - shoulder_y > 0.08:
                     coaching_msg = "Hips too low. Raise your hips to align with your shoulders."
                     posture_ok = False
                 # Hips too high => hip is significantly above shoulders (y smaller)
-                elif hip_y - shoulder_y < -0.12:
+                elif hip_y - shoulder_y < -0.05:
                     coaching_msg = "Hips too high. Lower your hips to form a straight line."
                     posture_ok = False
                 else:
@@ -1197,14 +1197,34 @@ def stream_process(request):
             ideal_landmarks = _ideal_landmarks_for_response(ideal_dict) if ideal_dict else None
 
             # Correct posture = 100%; in position but wrong form = accuracy from distance to ideal (like tree pose)
+            # Geometric override: even if ML says "C", check hip alignment
+            def _get_y_plank(idx, default=0.5):
+                if idx >= len(landmarks): return default
+                lm = landmarks[idx]
+                if lm is None: return default
+                return float(lm.get("y", default) if isinstance(lm, dict) else getattr(lm, "y", default))
+
+            shoulder_y = (_get_y_plank(11) + _get_y_plank(12)) / 2
+            hip_y = (_get_y_plank(23) + _get_y_plank(24)) / 2
+            ankle_y = (_get_y_plank(27) + _get_y_plank(28)) / 2
+            hip_shoulder_diff = hip_y - shoulder_y
+            hip_ankle_diff = ankle_y - hip_y
+
+            if hip_shoulder_diff < -0.05:
+                posture_ok = False
+                coaching_msg = "Hips too high. Lower your hips to form a straight line."
+            elif hip_shoulder_diff > 0.10:
+                posture_ok = False
+                coaching_msg = "Hips too low. Raise your hips to align with your shoulders."
+
             if posture_ok:
                 acc = 100
             else:
                 try:
                     ideal_acc = _accuracy_vs_ideal(landmarks, ideal_dict) if ideal_dict else float(confidence)
-                    acc = min(99, max(0, int(round(ideal_acc))))
+                    acc = min(70, max(0, int(round(ideal_acc))))
                 except (TypeError, KeyError, IndexError, AttributeError):
-                    acc = confidence
+                    acc = min(70, confidence)
             return Response(
                 {
                     "message": f"Plank: {coaching_msg}",
