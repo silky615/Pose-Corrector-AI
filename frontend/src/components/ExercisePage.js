@@ -145,7 +145,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                 if (!cancelled) {
                   setLiveFeedback(data);
                   postureOkRef.current = data.posture_ok;
-                  if (exerciseId === "plank") {
+                  if (exerciseId === "plank" || exerciseId === "tree_pose") {
                     if (data.posture_ok) {
                       if (!plankIntervalRef.current) {
                         plankIntervalRef.current = setInterval(() => {
@@ -188,7 +188,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
 
   function handleBack() {
     if (sessionIdRef.current) {
-      const reps = exerciseId === "plank" ? plankSecondsRef.current : (maxCounterRef.current || (liveFeedback ? liveFeedback.counter || 0 : 0));
+      const reps = (exerciseId === "plank" || exerciseId === "tree_pose") ? plankSecondsRef.current : (maxCounterRef.current || (liveFeedback ? liveFeedback.counter || 0 : 0));
       const acc = repAccuraciesRef.current.length > 0 ? Math.round(repAccuraciesRef.current.reduce((a,b) => a+b, 0) / repAccuraciesRef.current.length) : 0;
       api.endSession(sessionIdRef.current, reps, acc).catch(() => {});
       sessionIdRef.current = null;
@@ -399,7 +399,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
               <div className={`exercise-feedback${liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect"}`}>
                 <p className="exercise-feedback-message">{liveFeedback.message || (liveFeedback.posture_ok ? "✅ Good form!" : "⚠️ Adjust your form")}</p>
                 {liveFeedback.accuracy != null && <p className="exercise-feedback-accuracy">Accuracy: {Math.round(liveFeedback.accuracy)}%</p>}
-                {exerciseId === "plank" && (
+                {(exerciseId === "plank" || exerciseId === "tree_pose") && (
                   <p className="exercise-feedback-counter" style={{fontSize:"20px", fontWeight:"700", color: liveFeedback.posture_ok ? "#4ade80" : "#fca5a5"}}>
                     ⏱ {Math.floor(plankSeconds / 60).toString().padStart(2,"0")}:{(plankSeconds % 60).toString().padStart(2,"0")}
                     <button type="button" className="btn ghost" onClick={() => { plankSecondsRef.current = 0; setPlankSeconds(0); }} style={{ marginLeft:"12px", fontSize:"12px", padding:"3px 10px", minWidth:"auto" }}>Reset</button>
