@@ -1217,14 +1217,22 @@ def stream_process(request):
                 posture_ok = False
                 coaching_msg = "Hips too low. Raise your hips to align with your shoulders."
 
+            # Smooth accuracy: gradual 0->100 based on hip alignment
+            # posture_ok = True means hips are within correct range -> always 100%
+            # posture_ok = False -> smooth gradient based on how far from correct range
             if posture_ok:
                 acc = 100
             else:
-                try:
-                    ideal_acc = _accuracy_vs_ideal(landmarks, ideal_dict) if ideal_dict else float(confidence)
-                    acc = min(70, max(0, int(round(ideal_acc))))
-                except (TypeError, KeyError, IndexError, AttributeError):
-                    acc = min(70, confidence)
+                if hip_shoulder_diff < -0.05:
+                    # Hips too high: further above -0.05 = lower score
+                    over = abs(hip_shoulder_diff + 0.05)
+                    acc = max(0, int(84 - (over / 0.15) * 84))
+                elif hip_shoulder_diff > 0.10:
+                    # Hips too low: further below 0.10 = lower score
+                    over = abs(hip_shoulder_diff - 0.10)
+                    acc = max(0, int(84 - (over / 0.15) * 84))
+                else:
+                    acc = 70
             return Response(
                 {
                     "message": f"Plank: {coaching_msg}",
