@@ -2834,7 +2834,9 @@ def profile(request):
         user = User.objects.get(id=int(user_id))
     except (User.DoesNotExist, ValueError):
         return JsonResponse({"error": "User not found"}, status=404)
-    today = timezone.now().date()
+    from datetime import timezone as dt_timezone
+    PST = dt_timezone(timedelta(hours=-8))
+    today = timezone.now().astimezone(PST).date()
     week_start = today - timedelta(days=today.weekday())
     sessions = Session.objects.filter(user=user).exclude(ended_at__isnull=True)
     total_workouts = sessions.count()
@@ -2843,7 +2845,7 @@ def profile(request):
     recent_workouts = [
         {
             "exercise_type": s.exercise_type,
-            "date": s.ended_at.strftime("%Y-%m-%d") if s.ended_at else "",
+            "date": s.ended_at.astimezone(__import__("datetime").timezone(__import__("datetime").timedelta(hours=-8))).strftime("%Y-%m-%d") if s.ended_at else "",
             "reps": s.total_reps or 0,
             "accuracy": float(s.avg_accuracy) if s.avg_accuracy is not None else 0,
         }
@@ -2862,7 +2864,7 @@ def profile(request):
             break
     # Weekly activity: current week Mon–Sun
     week_days = [week_start + timedelta(days=i) for i in range(7)]
-    weekly_activity = [sessions.filter(ended_at__date=d).exists() for d in week_days]
+    weekly_activity = [d <= today and sessions.filter(ended_at__date=d).exists() for d in week_days]
     # Exercise summary: per exercise_type -> sessions, total reps, avg accuracy
     from django.db.models import Sum
     from collections import defaultdict
