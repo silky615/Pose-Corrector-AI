@@ -317,6 +317,21 @@ def validate_bicep_curl_pose(landmarks_json: list) -> tuple:
             f"Lower your {best_arm_side} hand to the side of your body to start the curl.",
             best_angle,
         )
+    
+    # Reject arms spread horizontally (T-pose / arms out to sides)
+    _el = get_landmark(f"{best_arm_side.upper()}_ELBOW")
+    if _el is not None and _sh is not None:
+        elbow_x = _el.get("x", 0.5) if isinstance(_el, dict) else getattr(_el, "x", 0.5)
+        shoulder_x = _sh.get("x", 0.5) if isinstance(_sh, dict) else getattr(_sh, "x", 0.5)
+        wrist_x = _wr.get("x", 0.5) if isinstance(_wr, dict) else getattr(_wr, "x", 0.5)
+        horizontal_spread = abs(wrist_x - shoulder_x)
+        vertical_drop = abs(wrist_y - shoulder_y)
+        if horizontal_spread > vertical_drop * 1.5:
+            return (
+                False,
+                f"Lower your {best_arm_side} arm to your side — arms should not be spread outward.",
+                best_angle,
+            )
 
     # Arm is visible and not an overhead raise — valid curl at any angle
     return True, None, best_angle
@@ -402,7 +417,7 @@ def validate_torso_upright(landmarks_json: list) -> tuple:
 
     if vert_distance > 0.05:
         lean_ratio = abs(horiz_offset) / vert_distance
-        if lean_ratio > 0.35:
+        if lean_ratio > 0.25:
             if horiz_offset > 0:
                 return False, "Stand up straight — you are leaning forward. Keep your back upright for a proper bicep curl."
             else:
