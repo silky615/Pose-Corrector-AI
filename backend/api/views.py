@@ -39,6 +39,7 @@ from api.exercise_logic import (
     PLANK_IMPORTANT_LANDMARKS,
     SQUAT_IMPORTANT_LANDMARKS,
     TREE_POSE_IMPORTANT_LANDMARKS,
+    PUSH_UP_IMPORTANT_LANDMARKS,
     POSE_LANDMARK_INDEX,
     KEY_LANDMARKS_FOR_ACCURACY,
     IDEAL_POSES,
@@ -170,6 +171,10 @@ def get_models():
                 "err_model": load_machine_learning_model("lunge_err_model.pkl"),
                 "scaler": load_machine_learning_model("lunge_input_scaler.pkl"),
             },
+            "push_up": {
+                "model": load_machine_learning_model("push_up_model.pkl"),
+                "scaler": load_machine_learning_model("push_up_input_scaler.pkl"),
+            },
         }
         _models_loaded = True
         print("AI Server: All models ready.")
@@ -197,6 +202,8 @@ def build_feature_row(ex_type: str, landmarks_json: list) -> np.ndarray:
         important = SQUAT_IMPORTANT_LANDMARKS
     elif ex_type == "tree_pose":
         important = TREE_POSE_IMPORTANT_LANDMARKS
+    elif ex_type == "push_up":
+        important = PUSH_UP_IMPORTANT_LANDMARKS
     else:
         # Fallback: use all landmarks as-is (33 * 4 = 132)
         row = []
@@ -2009,141 +2016,125 @@ def stream_process(request):
             if not is_push_up_like:
                 return Response({
                     "message": f"Push-up: {gate_msg}",
-                    "accuracy": 0,
-                    "posture_ok": False,
-                    "stage": "up",
-                    "counter": 0,
+                    "accuracy": 0, "posture_ok": False,
+                    "stage": "up", "counter": 0,
                 })
 
-            calculate_angle = get_calculate_angle()
-            if calculate_angle is None:
-                return Response({
-                    "message": "Push-up: Pose analysis not available.",
-                    "accuracy": 0,
-                    "posture_ok": False,
-                    "stage": "up",
-                    "counter": 0,
-                })
-
-            def _get_pu(landmarks_list, idx, key, default=0.5):
-                if idx >= len(landmarks_list):
-                    return default
-                lm = landmarks_list[idx]
-                if lm is None:
-                    return default
-                if isinstance(lm, dict):
-                    return lm.get(key, default)
-                return getattr(lm, key, default)
-
-            # 11=L_SHOULDER, 12=R_SHOULDER, 13=L_ELBOW, 14=R_ELBOW, 15=L_WRIST, 16=R_WRIST
-            # 23=L_HIP, 24=R_HIP, 25=L_KNEE, 26=R_KNEE, 27=L_ANKLE, 28=R_ANKLE
-            ls_x = _get_pu(landmarks, 11, "x")
-            ls_y = _get_pu(landmarks, 11, "y")
-            rs_x = _get_pu(landmarks, 12, "x")
-            rs_y = _get_pu(landmarks, 12, "y")
-            le_x = _get_pu(landmarks, 13, "x")
-            le_y = _get_pu(landmarks, 13, "y")
-            re_x = _get_pu(landmarks, 14, "x")
-            re_y = _get_pu(landmarks, 14, "y")
-            lw_x = _get_pu(landmarks, 15, "x")
-            lw_y = _get_pu(landmarks, 15, "y")
-            rw_x = _get_pu(landmarks, 16, "x")
-            rw_y = _get_pu(landmarks, 16, "y")
-            lh_x = _get_pu(landmarks, 23, "x")
-            lh_y = _get_pu(landmarks, 23, "y")
-            rh_x = _get_pu(landmarks, 24, "x")
-            rh_y = _get_pu(landmarks, 24, "y")
-            lk_x = _get_pu(landmarks, 25, "x")
-            lk_y = _get_pu(landmarks, 25, "y")
-            rk_x = _get_pu(landmarks, 26, "x")
-            rk_y = _get_pu(landmarks, 26, "y")
-            la_x = _get_pu(landmarks, 27, "x")
-            la_y = _get_pu(landmarks, 27, "y")
-            ra_x = _get_pu(landmarks, 28, "x")
-            ra_y = _get_pu(landmarks, 28, "y")
-
-            # Elbow angles (shoulder-elbow-wrist) for phase
-            left_elbow_angle = float(calculate_angle([ls_x, ls_y], [le_x, le_y], [lw_x, lw_y]))
-            right_elbow_angle = float(calculate_angle([rs_x, rs_y], [re_x, re_y], [rw_x, rw_y]))
-            # Use the more bent arm (min angle) so we don't count a rep until both arms come up
-            elbow_angle = min(left_elbow_angle, right_elbow_angle)
-
-            # Body line: knee push-up = feet lifted (ankle above knee) → use shoulder-hip-knee; else full push-up → shoulder-hip-ankle
-            shoulder_pt = [(ls_x + rs_x) / 2, (ls_y + rs_y) / 2]
-            hip_pt = [(lh_x + rh_x) / 2, (lh_y + rh_y) / 2]
-            knee_pt = [(lk_x + rk_x) / 2, (lk_y + rk_y) / 2]
-            ankle_pt = [(la_x + ra_x) / 2, (la_y + ra_y) / 2]
-            knee_y_mid = (lk_y + rk_y) / 2
-            ankle_y_mid = (la_y + ra_y) / 2
-            # Knee push-up: feet lifted (ankle higher than knee in image = smaller y)
-            is_knee_pushup = ankle_y_mid < knee_y_mid + 0.08
-            if is_knee_pushup:
-                body_line_angle = float(calculate_angle(shoulder_pt, hip_pt, knee_pt))
-            else:
-                body_line_angle = float(calculate_angle(shoulder_pt, hip_pt, ankle_pt))
-            BODY_LINE_STRICT = 160   # 100% only when really straight
-            BODY_LINE_MIN = 152      # below this = clear sag or pike
-            body_straight = body_line_angle >= BODY_LINE_STRICT
-            body_acceptable = body_line_angle >= BODY_LINE_MIN
-
-            # Rep logic: up when arms extended (>160°), down when chest low (<90°)
-            PUSH_UP_TOP = 160
-            PUSH_UP_BOTTOM = 90
             client_key = _get_client_key(request)
             _ensure_push_up_state(client_key)
             st = _PUSH_UP_RT_STATE[client_key]
 
-            rep_inc = False
-            if elbow_angle < PUSH_UP_BOTTOM:
+            def _get_pu(landmarks_list, idx, key, default=0.5):
+                if idx >= len(landmarks_list): return default
+                lm = landmarks_list[idx]
+                if lm is None: return default
+                return lm.get(key, default) if isinstance(lm, dict) else getattr(lm, key, default)
+
+            # ── Geometry: body line + elbow angle ────────────────────────────
+            calculate_angle = get_calculate_angle()
+            ls_x = _get_pu(landmarks, 11, "x"); ls_y = _get_pu(landmarks, 11, "y")
+            rs_x = _get_pu(landmarks, 12, "x"); rs_y = _get_pu(landmarks, 12, "y")
+            le_x = _get_pu(landmarks, 13, "x"); le_y = _get_pu(landmarks, 13, "y")
+            re_x = _get_pu(landmarks, 14, "x"); re_y = _get_pu(landmarks, 14, "y")
+            lw_x = _get_pu(landmarks, 15, "x"); lw_y = _get_pu(landmarks, 15, "y")
+            rw_x = _get_pu(landmarks, 16, "x"); rw_y = _get_pu(landmarks, 16, "y")
+            lh_x = _get_pu(landmarks, 23, "x"); lh_y = _get_pu(landmarks, 23, "y")
+            rh_x = _get_pu(landmarks, 24, "x"); rh_y = _get_pu(landmarks, 24, "y")
+            lk_x = _get_pu(landmarks, 25, "x"); lk_y = _get_pu(landmarks, 25, "y")
+            rk_x = _get_pu(landmarks, 26, "x"); rk_y = _get_pu(landmarks, 26, "y")
+            la_x = _get_pu(landmarks, 27, "x"); la_y = _get_pu(landmarks, 27, "y")
+            ra_x = _get_pu(landmarks, 28, "x"); ra_y = _get_pu(landmarks, 28, "y")
+
+            shoulder_pt = [(ls_x+rs_x)/2, (ls_y+rs_y)/2]
+            hip_pt      = [(lh_x+rh_x)/2, (lh_y+rh_y)/2]
+            knee_pt     = [(lk_x+rk_x)/2, (lk_y+rk_y)/2]
+            ankle_pt    = [(la_x+ra_x)/2, (la_y+ra_y)/2]
+            knee_y_mid  = (lk_y+rk_y)/2
+            ankle_y_mid = (la_y+ra_y)/2
+            is_knee_pushup = ankle_y_mid < knee_y_mid + 0.08
+            label = "Knee push-up" if is_knee_pushup else "Push-up"
+
+            body_line_angle = 180.0
+            left_elbow_angle = 160.0
+            right_elbow_angle = 160.0
+            if calculate_angle:
+                try:
+                    end_pt = knee_pt if is_knee_pushup else ankle_pt
+                    body_line_angle   = float(calculate_angle(shoulder_pt, hip_pt, end_pt))
+                    left_elbow_angle  = float(calculate_angle([ls_x,ls_y],[le_x,le_y],[lw_x,lw_y]))
+                    right_elbow_angle = float(calculate_angle([rs_x,rs_y],[re_x,re_y],[rw_x,rw_y]))
+                except Exception:
+                    pass
+
+            elbow_angle   = min(left_elbow_angle, right_elbow_angle)
+            body_straight = body_line_angle >= 160
+            body_ok       = body_line_angle >= 152
+
+            # ── ML model: predict stage (0=up, 1=down) ───────────────────────
+            ml_stage  = None
+            ml_conf   = 0
+            try:
+                models   = get_models()
+                pu_data  = models.get("push_up", {})
+                ml_model = pu_data.get("model")
+                ml_scaler= pu_data.get("scaler")
+                if ml_model and ml_scaler:
+                    row      = build_feature_row("push_up", landmarks)
+                    X        = ml_scaler.transform(row.reshape(1, -1))
+                    pred     = ml_model.predict(X)[0]
+                    proba    = ml_model.predict_proba(X)[0]
+                    ml_stage = "up" if int(pred) == 0 else "down"
+                    ml_conf  = int(round(float(max(proba)) * 100))
+                    print(f"[PUSHUP ML] pred={pred} stage={ml_stage} conf={ml_conf}")
+            except Exception as e:
+                print(f"[PUSHUP] ML error: {e}")
+
+            # ── Rep counting: use ML stage, fallback to geometry ──────────────
+            PUSH_UP_TOP    = 160
+            PUSH_UP_BOTTOM = 90
+            if ml_stage == "down" or (ml_stage is None and elbow_angle < PUSH_UP_BOTTOM):
                 st["stage"] = "down"
-            elif elbow_angle > PUSH_UP_TOP:
+            elif ml_stage == "up" or (ml_stage is None and elbow_angle > PUSH_UP_TOP):
                 if st["stage"] == "down":
                     st["counter"] += 1
-                    rep_inc = True
                 st["stage"] = "up"
 
-            # Coaching message and accuracy (100% when body straight AND at top OR at bottom with good depth)
-            label = "Knee push-up" if is_knee_pushup else "Push-up"
-            if not body_acceptable:
-                msg = f"{label}: Keep your body in a straight line from head to knees. Don't let your hips sag or pike up."
+            # ── Coaching message ──────────────────────────────────────────────
+            if not body_ok:
+                msg = f"{label}: Keep your body in a straight line. Don't let your hips sag or pike up."
                 acc = max(0, min(45, int(body_line_angle / 180 * 50)))
-                ok = False
-            elif body_straight and st["stage"] == "up" and elbow_angle >= PUSH_UP_TOP:
-                msg = f"{label}: Good form. Body straight, arms extended. Lower for next rep."
-                acc = 100
-                ok = True
-            elif body_straight and st["stage"] == "down" and elbow_angle < PUSH_UP_BOTTOM:
-                msg = f"{label}: Good form. Body straight, good depth. Push back up to complete the rep."
-                acc = 100
-                ok = True
-            elif not body_straight and st["stage"] == "up" and elbow_angle >= PUSH_UP_TOP:
-                msg = f"{label}: Straighten your body from shoulders to knees. Don't sag or pike."
-                acc = max(60, min(85, int(body_line_angle / 180 * 100)))
-                ok = False
+                ok  = False
             elif st["stage"] == "down":
                 if body_straight:
-                    msg = f"{label}: Good depth. Push back up to complete the rep."
-                    acc = 85
+                    msg = f"{label}: Good depth! Push back up to complete the rep."
+                    acc = ml_conf if ml_conf > 0 else 85
+                    ok  = True
                 else:
                     msg = f"{label}: Keep a straight line as you push back up."
                     acc = max(50, min(75, int(body_line_angle / 180 * 100)))
-                ok = False
+                    ok  = False
+            elif st["stage"] == "up" and body_straight:
+                msg = f"{label}: Great form! Lower your chest for the next rep."
+                acc = ml_conf if ml_conf > 0 else 100
+                ok  = True
+            elif st["stage"] == "up" and not body_straight:
+                msg = f"{label}: Straighten your body from shoulders to knees."
+                acc = max(60, min(85, int(body_line_angle / 180 * 100)))
+                ok  = False
             else:
                 if elbow_angle < PUSH_UP_BOTTOM + 30:
-                    msg = f"{label}: Lower until your elbows reach about 90°, then push up."
+                    msg = f"{label}: Lower until your elbows reach about 90 degrees, then push up."
                 else:
                     msg = f"{label}: Push up until your arms are fully extended."
                 acc = max(0, min(99, int((elbow_angle - PUSH_UP_BOTTOM) / (PUSH_UP_TOP - PUSH_UP_BOTTOM) * 99)))
-                if not body_straight:
-                    acc = min(acc, max(50, int(body_line_angle / 180 * 100)))
-                ok = False
+                ok  = False
 
             return Response({
-                "message": msg,
-                "accuracy": acc,
+                "message":    msg,
+                "accuracy":   acc,
                 "posture_ok": ok,
-                "stage": st["stage"],
-                "counter": st["counter"],
+                "stage":      st["stage"],
+                "counter":    st["counter"],
             })
 
         # Wall sit: SIDE view only; check ~90° hip + knee angles and hold timer
