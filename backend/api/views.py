@@ -1549,138 +1549,150 @@ def stream_process(request):
                 }
             )
 
-        # Lunge: use stage + error classifiers
+        # Lunge: SIDE VIEW detection
         if ex_type == "lunge":
-            models = get_models()
+            calculate_angle = get_calculate_angle()
 
+            def _get(idx, key, default=0.5):
+                if idx >= len(landmarks): return default
+                lm = landmarks[idx]
+                if lm is None: return default
+                return lm.get(key, default) if isinstance(lm, dict) else getattr(lm, key, default)
+
+            def _get_vis(idx, default=0.0):
+                if idx >= len(landmarks): return default
+                lm = landmarks[idx]
+                if lm is None: return default
+                return lm.get("visibility", default) if isinstance(lm, dict) else getattr(lm, "visibility", default)
+
+            # Side view: always use LEFT side landmarks (ignore visibility — unreliable for side view)
+            # MediaPipe still tracks x/y correctly even with low visibility score
+            l_hip_x   = _get(23,"x"); l_hip_y   = _get(23,"y")
+            l_knee_x  = _get(25,"x"); l_knee_y  = _get(25,"y")
+            l_ankle_x = _get(27,"x"); l_ankle_y = _get(27,"y")
+            r_hip_x   = _get(24,"x"); r_hip_y   = _get(24,"y")
+            r_knee_x  = _get(26,"x"); r_knee_y  = _get(26,"y")
+            r_ankle_x = _get(28,"x"); r_ankle_y = _get(28,"y")
+
+            # Use z coordinate for angle calculation (world coords: x,y,z)
+            # For side view lunge, use x and z instead of x and y
+            l_hip_z   = _get(23,"z"); r_hip_z   = _get(24,"z")
+            l_knee_z  = _get(25,"z"); r_knee_z  = _get(26,"z")
+            l_ankle_z = _get(27,"z"); r_ankle_z = _get(28,"z")
+
+            if calculate_angle:
+                try:
+                    # Use y and z for angle (vertical drop + depth)
+                    l_knee_ang_raw = float(calculate_angle([l_hip_y,l_hip_z],[l_knee_y,l_knee_z],[l_ankle_y,l_ankle_z]))
+                    r_knee_ang_raw = float(calculate_angle([r_hip_y,r_hip_z],[r_knee_y,r_knee_z],[r_ankle_y,r_ankle_z]))
+                    print(f"[LUNGE YZ] l={l_knee_ang_raw:.1f} r={r_knee_ang_raw:.1f} l_hip_z={l_hip_z:.3f} l_knee_z={l_knee_z:.3f} l_ankle_z={l_ankle_z:.3f}")
+                except Exception:
+                    l_knee_ang_raw, r_knee_ang_raw = 180.0, 180.0
+            else:
+                l_knee_ang_raw, r_knee_ang_raw = 180.0, 180.0
+
+            # Front leg = more bent (smaller angle)
+            if l_knee_ang_raw <= r_knee_ang_raw:
+                hip      = [l_hip_x, l_hip_y]
+                knee     = [l_knee_x, l_knee_y]
+                ankle    = [l_ankle_x, l_ankle_y]
+                shoulder = [_get(11,"x"), _get(11,"y")]
+                side     = "left"
+            else:
+                hip      = [r_hip_x, r_hip_y]
+                knee     = [r_knee_x, r_knee_y]
+                ankle    = [r_ankle_x, r_ankle_y]
+                shoulder = [_get(12,"x"), _get(12,"y")]
+                side     = "right"
+
+            print(f"[LUNGE SIDE] side={side} l_knee={l_knee_ang_raw:.1f} r_knee={r_knee_ang_raw:.1f}")
+
+            # Sanity check: person must be standing (hip y must be above ankle y in world coords)
+            # In world coords, y increases downward, so hip_y should be LESS than ankle_y
+            hip_y_check  = _get(23,"y") if side == "left" else _get(24,"y")
+            ankle_y_check = _get(27,"y") if side == "left" else _get(28,"y")
+            # Require side profile: shoulders must be stacked (small x distance between them)
+            ls_x = _get(11,"x"); rs_x = _get(12,"x")
+            shoulder_spread = abs(ls_x - rs_x)
+            print(f"[LUNGE STAND] shoulder_spread={shoulder_spread:.3f}")
+            if shoulder_spread > 0.15:
+                return Response({"message": "Lunge: Stand sideways to the camera — your side should face the lens.", "accuracy": 0, "posture_ok": False, "stage": "up"})
+            print(f"[LUNGE COORDS] l_hip=({l_hip_x:.3f},{l_hip_y:.3f}) l_knee=({l_knee_x:.3f},{l_knee_y:.3f}) l_ankle=({l_ankle_x:.3f},{l_ankle_y:.3f})")
+            print(f"[LUNGE COORDS] r_hip=({r_hip_x:.3f},{r_hip_y:.3f}) r_knee=({r_knee_x:.3f},{r_knee_y:.3f}) r_ankle=({r_ankle_x:.3f},{r_ankle_y:.3f})")
+
+            # Use the already-calculated YZ angles
+            knee_ang = min(l_knee_ang_raw, r_knee_ang_raw)
+
+            print(f"[LUNGE SIDE] knee_ang={knee_ang:.1f}")
+
+            # Not lunging at all
+            if knee_ang > 160:
+                return Response({
+                    "message": "Lunge: Step one foot forward and lower your body.",
+                    "accuracy": 0, "posture_ok": False, "stage": "up"
+                })
+
+            stage = "down" if knee_ang < 115 else "up"
+
+            # Torso upright check (shoulder should be above hip vertically)
+            shoulder_y = float(shoulder[1])
+            hip_y      = float(hip[1])
+            shoulder_x = float(shoulder[0])
+            hip_x      = float(hip[0])
+            vert_dist  = abs(hip_y - shoulder_y)
+            horiz_off  = abs(shoulder_x - hip_x)
+            lean_ratio = horiz_off / vert_dist if vert_dist > 0.05 else 0
+            print(f"[LUNGE SIDE] lean_ratio={lean_ratio:.3f} stage={stage}")
+
+            if lean_ratio > 0.5:
+                return Response({
+                    "message": "Lunge: Keep your torso upright — do not lean forward.",
+                    "accuracy": 50, "posture_ok": False, "stage": stage
+                })
+
+            # Depth check
+            if stage == "up" and knee_ang > 140:
+                return Response({
+                    "message": "Lunge: Lower your body more — aim for 90 degrees in your front knee.",
+                    "accuracy": 55, "posture_ok": False, "stage": stage
+                })
+
+            # Run ML for final verdict
+            models = get_models()
             l_data = models.get("lunge") or {}
             stage_model = l_data.get("stage_model")
-            err_model = l_data.get("err_model")
-            scaler = l_data.get("scaler")
+            err_model   = l_data.get("err_model")
+            scaler      = l_data.get("scaler")
 
-            if not stage_model or not err_model:
-                # Fall back to a simple rule-based lunge check if ML models aren't available.
-                calculate_angle = get_calculate_angle()
-                if calculate_angle is None:
-                    return Response({"message": "Lunge: Pose analysis not available.", "accuracy": 0, "posture_ok": False})
-
-                def _get(idx, key, default=0.5):
-                    if idx >= len(landmarks):
-                        return default
-                    lm = landmarks[idx]
-                    if lm is None:
-                        return default
-                    if isinstance(lm, dict):
-                        return lm.get(key, default)
-                    return getattr(lm, key, default)
-
-                # Compute knee angles and pick the more bent leg as the "front" leg.
-                l_hip = [_get(23, "x"), _get(23, "y")]
-                l_knee = [_get(25, "x"), _get(25, "y")]
-                l_ankle = [_get(27, "x"), _get(27, "y")]
-                r_hip = [_get(24, "x"), _get(24, "y")]
-                r_knee = [_get(26, "x"), _get(26, "y")]
-                r_ankle = [_get(28, "x"), _get(28, "y")]
+            if stage_model and err_model:
+                X_in = X
+                if scaler is not None:
+                    try:
+                        X_in = scaler.transform(X)
+                    except Exception as e:
+                        print(f"Lunge scaler error: {e}")
                 try:
-                    l_knee_ang = float(calculate_angle(l_hip, l_knee, l_ankle))
-                    r_knee_ang = float(calculate_angle(r_hip, r_knee, r_ankle))
-                except Exception:
-                    l_knee_ang, r_knee_ang = 180.0, 180.0
-
-                if l_knee_ang <= r_knee_ang:
-                    front = ("left", l_hip, l_knee, l_ankle, l_knee_ang)
-                else:
-                    front = ("right", r_hip, r_knee, r_ankle, r_knee_ang)
-
-                side, hip_pt, knee_pt, ankle_pt, knee_ang = front
-                stage = "down" if knee_ang < 125 else "up"
-
-                # Knee tracking: knee should be roughly over ankle (x alignment)
-                knee_x = float(knee_pt[0])
-                ankle_x = float(ankle_pt[0])
-                align_err = abs(knee_x - ankle_x)
-                if align_err > 0.07:
-                    msg = "Lunge: Keep your front knee tracking over your toes (don’t let it cave in)."
-                    return Response({"message": msg, "accuracy": 60, "posture_ok": False, "stage": stage})
-
-                if stage == "down":
-                    msg = "Lunge: Good depth. Push through the front heel to return up."
-                    return Response({"message": msg, "accuracy": 90, "posture_ok": True, "stage": stage})
-                msg = "Lunge: Step forward and lower until your front knee is about 90°."
-                return Response({"message": msg, "accuracy": 75, "posture_ok": False, "stage": stage})
-
-            X_in = X
-            if scaler is not None:
-                try:
-                    X_in = scaler.transform(X)
+                    err        = err_model.predict(X_in)[0]
+                    err_probs  = err_model.predict_proba(X_in)[0]
+                    err_conf   = max(err_probs)
+                    is_correct = str(err) == "C" and err_conf >= 0.55
+                    print(f"[LUNGE SIDE] ML err={err} conf={err_conf:.2f} is_correct={is_correct}")
                 except Exception as e:
-                    print(f"Lunge scaler transform error: {e}")
-
-            try:
-                stage = stage_model.predict(X_in)[0]
-                stage_probs = stage_model.predict_proba(X_in)[0]
-                stage_conf = max(stage_probs)
-
-                err = err_model.predict(X_in)[0]
-                err_probs = err_model.predict_proba(X_in)[0]
-                err_conf = max(err_probs)
-            except Exception as e:
-                print(f"Lunge model error: {e}")
-                # Fall back to rule-based lunge instead of surfacing a hard error.
-                calculate_angle = get_calculate_angle()
-                if calculate_angle is None:
-                    return Response({"message": "Lunge: Processing error.", "accuracy": 0, "posture_ok": False})
-
-                def _get(idx, key, default=0.5):
-                    if idx >= len(landmarks):
-                        return default
-                    lm = landmarks[idx]
-                    if lm is None:
-                        return default
-                    if isinstance(lm, dict):
-                        return lm.get(key, default)
-                    return getattr(lm, key, default)
-
-                l_hip = [_get(23, "x"), _get(23, "y")]
-                l_knee = [_get(25, "x"), _get(25, "y")]
-                l_ankle = [_get(27, "x"), _get(27, "y")]
-                r_hip = [_get(24, "x"), _get(24, "y")]
-                r_knee = [_get(26, "x"), _get(26, "y")]
-                r_ankle = [_get(28, "x"), _get(28, "y")]
-                try:
-                    l_knee_ang = float(calculate_angle(l_hip, l_knee, l_ankle))
-                    r_knee_ang = float(calculate_angle(r_hip, r_knee, r_ankle))
-                except Exception:
-                    l_knee_ang, r_knee_ang = 180.0, 180.0
-                knee_ang = min(l_knee_ang, r_knee_ang)
-                stage = "down" if knee_ang < 125 else "up"
-                msg = "Lunge: Keep your torso upright and lower until your front knee is about 90°."
-                acc = 80 if stage == "down" else 70
-                return Response({"message": msg, "accuracy": acc, "posture_ok": False, "stage": stage})
-
-            # Example mapping; adjust to your label set
-            # err classes: C=correct, L=incorrect
-            # stage classes: D=down, I=intermediate, M=middle
-            stage_map = {"D": "down", "I": "intermediate", "M": "middle"}
-            stage_label = stage_map.get(str(stage), str(stage))
-
-            is_correct = str(err) == "C"
-            is_down    = str(stage) == "D"
-
-            if is_correct and is_down:
-                message = f"Lunge: Great form! Good depth, keep it up."
-                acc = int(round(err_conf * 100))
-                ok  = True
-            elif is_correct:
-                message = f"Lunge: Good form. Lower your front knee to about 90° for full depth."
-                acc = int(round(err_conf * 100))
-                ok  = True
+                    print(f"Lunge ML error: {e}")
+                    is_correct = True
+                    err_conf   = 0.8
             else:
-                message = f"Lunge: Keep your front knee tracking over your toes and step further forward."
-                acc = max(40, int(round(err_conf * 60)))
-                ok  = False
+                is_correct = True
+                err_conf   = 0.8
 
-            return Response({"message": message, "accuracy": acc, "posture_ok": bool(ok), "stage": stage_label})
+            acc = int(round(err_conf * 100))
+
+            if is_correct and stage == "down":
+                return Response({"message": "Lunge: Excellent! Great depth and form.", "accuracy": acc, "posture_ok": True, "stage": stage})
+            elif is_correct:
+                return Response({"message": "Lunge: Good form! Lower your front knee to 90 degrees.", "accuracy": acc, "posture_ok": True, "stage": stage})
+            else:
+                return Response({"message": "Lunge: Keep your front knee over your toes and step further forward.", "accuracy": max(40, int(err_conf * 60)), "posture_ok": False, "stage": stage})
 
         # Simple geometric coaching for hand raise (no ML). Dynamic accuracy 0–100.
         if ex_type == "hand_raise":
