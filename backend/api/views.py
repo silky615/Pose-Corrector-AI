@@ -40,6 +40,7 @@ from api.exercise_logic import (
     SQUAT_IMPORTANT_LANDMARKS,
     TREE_POSE_IMPORTANT_LANDMARKS,
     PUSH_UP_IMPORTANT_LANDMARKS,
+    LUNGE_IMPORTANT_LANDMARKS,
     POSE_LANDMARK_INDEX,
     KEY_LANDMARKS_FOR_ACCURACY,
     IDEAL_POSES,
@@ -204,6 +205,8 @@ def build_feature_row(ex_type: str, landmarks_json: list) -> np.ndarray:
         important = TREE_POSE_IMPORTANT_LANDMARKS
     elif ex_type == "push_up":
         important = PUSH_UP_IMPORTANT_LANDMARKS
+    elif ex_type == "lunge":
+        important = LUNGE_IMPORTANT_LANDMARKS
     else:
         # Fallback: use all landmarks as-is (33 * 4 = 132)
         row = []
@@ -1656,17 +1659,28 @@ def stream_process(request):
                 return Response({"message": msg, "accuracy": acc, "posture_ok": False, "stage": stage})
 
             # Example mapping; adjust to your label set
-            err_map = {
-                "OK": "Great lunge form.",
-                "KNEE_IN": "Push your knee outward; don't let it cave in.",
-                "STEP_TOO_SHORT": "Take a slightly longer step for better balance.",
-            }
-            message = f"Lunge ({stage}): {err_map.get(str(err), err)}"
+            # err classes: C=correct, L=incorrect
+            # stage classes: D=down, I=intermediate, M=middle
+            stage_map = {"D": "down", "I": "intermediate", "M": "middle"}
+            stage_label = stage_map.get(str(stage), str(stage))
 
-            ok = str(err) in ["C", "OK"] and err_conf >= 0.8 and stage_conf >= 0.8
-            # Correct posture = 100%; in position but wrong form = calculated from model confidence
-            acc = 100 if ok else int(round(max(err_conf, stage_conf) * 100))
-            return Response({"message": message, "accuracy": acc, "posture_ok": bool(ok)})
+            is_correct = str(err) == "C"
+            is_down    = str(stage) == "D"
+
+            if is_correct and is_down:
+                message = f"Lunge: Great form! Good depth, keep it up."
+                acc = int(round(err_conf * 100))
+                ok  = True
+            elif is_correct:
+                message = f"Lunge: Good form. Lower your front knee to about 90° for full depth."
+                acc = int(round(err_conf * 100))
+                ok  = True
+            else:
+                message = f"Lunge: Keep your front knee tracking over your toes and step further forward."
+                acc = max(40, int(round(err_conf * 60)))
+                ok  = False
+
+            return Response({"message": message, "accuracy": acc, "posture_ok": bool(ok), "stage": stage_label})
 
         # Simple geometric coaching for hand raise (no ML). Dynamic accuracy 0–100.
         if ex_type == "hand_raise":
