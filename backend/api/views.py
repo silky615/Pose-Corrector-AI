@@ -176,6 +176,10 @@ def get_models():
                 "model": load_machine_learning_model("push_up_model.pkl"),
                 "scaler": load_machine_learning_model("push_up_input_scaler.pkl"),
             },
+            "tree_pose": {
+                "model": load_machine_learning_model("tree_pose_model.pkl"),
+                "scaler": load_machine_learning_model("tree_pose_input_scaler.pkl"),
+            },
         }
         _models_loaded = True
         print("AI Server: All models ready.")
@@ -2477,15 +2481,33 @@ def stream_process(request):
             l_shldr_y  = _gy("LEFT_SHOULDER"); r_shldr_y = _gy("RIGHT_SHOULDER")
             avg_shldr_y   = (l_shldr_y + r_shldr_y) / 2
             best_wrist_y  = min(l_wrist_y, r_wrist_y)
-            arms_raised   = best_wrist_y < avg_shldr_y - 0.05
-
-            if not arms_raised:
+            l_hip_y       = _gy("LEFT_HIP"); r_hip_y = _gy("RIGHT_HIP")
+            avg_hip_y     = (l_hip_y + r_hip_y) / 2
+            # Arms must be raised at least above the hips
+            # Arms check: wrists above shoulders (overhead) OR close together (prayer)
+            # Get X coords inline using same pattern as _gy
+            def _gx(name):
+                i = POSE_LANDMARK_INDEX.get(name)
+                if i is None or i >= len(landmarks): return 0.5
+                p = landmarks[i]
+                return p.get("x", 0.5) if isinstance(p, dict) else getattr(p, "x", 0.5)
+            l_wrist_x = _gx("LEFT_WRIST"); r_wrist_x = _gx("RIGHT_WRIST")
+            wrist_spread = abs(l_wrist_x - r_wrist_x)
+            # Overhead: both wrists clearly above shoulders (y smaller = higher on screen)
+            arms_overhead = best_wrist_y < avg_shldr_y - 0.05
+            # Prayer: wrists close together AND above hips
+            l_hip_y = _gy("LEFT_HIP"); r_hip_y = _gy("RIGHT_HIP")
+            avg_hip_y = (l_hip_y + r_hip_y) / 2
+            arms_prayer = wrist_spread < 0.20 and best_wrist_y < avg_shldr_y + 0.05
+            arms_ok = arms_overhead or arms_prayer
+            print(f"[TREE ARMS] overhead={arms_overhead} prayer={arms_prayer} spread={wrist_spread:.3f} best_wrist_y={best_wrist_y:.3f} avg_shldr_y={avg_shldr_y:.3f}", flush=True)
+            if not arms_ok:
                 if tp.get("timer_start") is not None:
                     tp["elapsed"] = tp.get("elapsed", 0) + time.time() - tp["timer_start"]
                     tp["timer_start"] = None
                 return Response({
-                    "message":    "Tree Pose: Raise both arms above your head.",
-                    "accuracy":   0, "posture_ok": False,
+                    "message":    "Tree Pose: Raise arms overhead or bring hands to prayer at chest.",
+                    "accuracy":   20, "posture_ok": False,
                     "timer": round(tp.get("elapsed", 0.0), 1), "timer_display": "00:00",
                 })
 
@@ -2522,7 +2544,7 @@ def stream_process(request):
                     proba      = ml_model.predict_proba(X)[0]
                     conf       = int(round(float(max(proba)) * 100))
                     posture_ok = (str(pred).strip().lower() == "correct")
-                    print(f"[TREE ML] pred={pred} conf={conf} posture_ok={posture_ok}")
+                    print(f"[TREE ML] pred={pred} conf={conf} posture_ok={posture_ok}", flush=True)
                     if not posture_ok:
                         feedback_msg = "Tree Pose: Lift one foot, place it on your inner thigh."
                 else:
