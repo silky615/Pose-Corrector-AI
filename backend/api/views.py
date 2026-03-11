@@ -2489,6 +2489,22 @@ def stream_process(request):
                     "timer": round(tp.get("elapsed", 0.0), 1), "timer_display": "00:00",
                 })
 
+            # ── Geometry gate: one leg must be lifted ───
+            l_knee_y  = _gy("LEFT_KNEE");  r_knee_y  = _gy("RIGHT_KNEE")
+            l_ankle_y = _gy("LEFT_ANKLE"); r_ankle_y = _gy("RIGHT_ANKLE")
+            ankle_diff = abs(l_ankle_y - r_ankle_y)
+            knee_diff  = abs(l_knee_y  - r_knee_y)
+            one_leg_lifted = ankle_diff > 0.10 or knee_diff > 0.08
+            if not one_leg_lifted:
+                if tp.get("timer_start") is not None:
+                    tp["elapsed"] = tp.get("elapsed", 0) + time.time() - tp["timer_start"]
+                    tp["timer_start"] = None
+                return Response({
+                    "message":    "Tree Pose: Lift one foot and place it on your inner thigh.",
+                    "accuracy":   20, "posture_ok": False,
+                    "timer": round(tp.get("elapsed", 0.0), 1), "timer_display": "00:00",
+                })
+
             # ── ML model ─────────────────────────────────────────────────────
             posture_ok   = False
             conf         = 0
@@ -2504,8 +2520,8 @@ def stream_process(request):
                     X          = scaler.transform(row.reshape(1, -1))
                     pred       = ml_model.predict(X)[0]
                     proba      = ml_model.predict_proba(X)[0]
-                    conf       = int(round(float(proba[0]) * 100))
-                    posture_ok = (int(pred) == 0)
+                    conf       = int(round(float(max(proba)) * 100))
+                    posture_ok = (str(pred).strip().lower() == "correct")
                     print(f"[TREE ML] pred={pred} conf={conf} posture_ok={posture_ok}")
                     if not posture_ok:
                         feedback_msg = "Tree Pose: Lift one foot, place it on your inner thigh."
