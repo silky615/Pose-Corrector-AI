@@ -17,6 +17,7 @@ Constants and helpers below are used by api.views. Import them in views with:
       SQUAT_IMPORTANT_LANDMARKS,
       TREE_POSE_IMPORTANT_LANDMARKS,
       PUSH_UP_IMPORTANT_LANDMARKS,
+      LUNGE_IMPORTANT_LANDMARKS,
       IDEAL_POSES,
       KEY_LANDMARKS_FOR_ACCURACY,
       build_feature_row,
@@ -73,6 +74,18 @@ PUSH_UP_IMPORTANT_LANDMARKS = [
     "LEFT_HIP",       "RIGHT_HIP",
     "LEFT_KNEE",      "RIGHT_KNEE",
     "LEFT_ANKLE",     "RIGHT_ANKLE",
+]
+
+LUNGE_IMPORTANT_LANDMARKS = [
+    "NOSE",
+    "LEFT_SHOULDER", "RIGHT_SHOULDER",
+    "LEFT_ELBOW",    "RIGHT_ELBOW",
+    "LEFT_WRIST",    "RIGHT_WRIST",
+    "LEFT_HIP",      "RIGHT_HIP",
+    "LEFT_KNEE",     "RIGHT_KNEE",
+    "LEFT_ANKLE",    "RIGHT_ANKLE",
+    "LEFT_HEEL",     "RIGHT_HEEL",
+    "LEFT_FOOT_INDEX", "RIGHT_FOOT_INDEX",
 ]
 
 # MediaPipe Pose landmark indices (use when mediapipe package is not loaded)

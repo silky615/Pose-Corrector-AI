@@ -31,3 +31,7 @@ backend/api/views.py.bak
 backend/See
 frontend/FETCH_HEAD
 frontend/frontend.log
+
+# ML model files (retrain locally after pull)
+backend/static/model/tree_pose_model.pkl
+backend/static/model/tree_pose_input_scaler.pkl

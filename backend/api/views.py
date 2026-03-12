@@ -546,6 +546,7 @@ def _reset_exercise_counter(client_key: str, ex_type: str) -> None:
         }
     elif ex_type == "push_up":
         _PUSH_UP_RT_STATE[client_key] = {"stage": "up", "counter": 0}
+        _LUNGE_RT_STATE[client_key]    = {"stage": "up", "counter": 0}
     elif ex_type == "sit_up":
         _SITUP_RT_STATE[client_key] = {"stage": "down", "counter": 0}
     elif ex_type == "wall_sit":
@@ -710,6 +711,7 @@ def _ensure_squat_state(client_key: str):
 
 # --- Real-time push-up state ---
 _PUSH_UP_RT_STATE = {}
+_LUNGE_RT_STATE    = {}
 
 def _ensure_push_up_state(client_key: str):
     if client_key in _PUSH_UP_RT_STATE:
@@ -948,7 +950,9 @@ def stream_process(request):
     - JSON body: { "landmarks": [ {x, y, z, visibility}, ... ], optional "reset_counter": true }
     """
     ex_type = request.query_params.get("type", "bicep_curl")
+    if ex_type == "lunges": ex_type = "lunge"  # normalize frontend id
     landmarks = request.data.get("landmarks", [])
+    client_key = _get_client_key(request)
     reset_counter = request.data.get("reset_counter", False)
 
     print(f"🎯 stream_process: ex={ex_type}, landmarks={len(landmarks)}, file={__file__}")
@@ -1620,7 +1624,7 @@ def stream_process(request):
             shoulder_spread = abs(ls_x - rs_x)
             print(f"[LUNGE STAND] shoulder_spread={shoulder_spread:.3f}")
             if shoulder_spread > 0.15:
-                return Response({"message": "Lunge: Stand sideways to the camera — your side should face the lens.", "accuracy": 0, "posture_ok": False, "stage": "up"})
+                return Response({"message": "Lunge: Stand sideways to the camera — your side should face the lens.", "accuracy": 0, "posture_ok": False, "stage": "up", "counter": 0})
             print(f"[LUNGE COORDS] l_hip=({l_hip_x:.3f},{l_hip_y:.3f}) l_knee=({l_knee_x:.3f},{l_knee_y:.3f}) l_ankle=({l_ankle_x:.3f},{l_ankle_y:.3f})")
             print(f"[LUNGE COORDS] r_hip=({r_hip_x:.3f},{r_hip_y:.3f}) r_knee=({r_knee_x:.3f},{r_knee_y:.3f}) r_ankle=({r_ankle_x:.3f},{r_ankle_y:.3f})")
 
@@ -1633,7 +1637,7 @@ def stream_process(request):
             if knee_ang > 160:
                 return Response({
                     "message": "Lunge: Step one foot forward and lower your body.",
-                    "accuracy": 0, "posture_ok": False, "stage": "up"
+                    "accuracy": 0, "posture_ok": False, "stage": "up", "counter": 0
                 })
 
             stage = "down" if knee_ang < 115 else "up"
@@ -1660,6 +1664,16 @@ def stream_process(request):
                     "message": "Lunge: Lower your body more — aim for 90 degrees in your front knee.",
                     "accuracy": 55, "posture_ok": False, "stage": stage
                 })
+
+            # Rep counter: up→down→up = 1 rep
+            if client_key not in _LUNGE_RT_STATE:
+                _LUNGE_RT_STATE[client_key] = {"stage": "up", "counter": 0}
+            ls = _LUNGE_RT_STATE[client_key]
+            if stage == "down" and ls["stage"] == "up":
+                ls["stage"] = "down"
+            elif stage == "up" and ls["stage"] == "down":
+                ls["counter"] += 1
+                ls["stage"] = "up"
 
             # Run ML for final verdict
             models = get_models()
@@ -1692,11 +1706,11 @@ def stream_process(request):
             acc = int(round(err_conf * 100))
 
             if is_correct and stage == "down":
-                return Response({"message": "Lunge: Excellent! Great depth and form.", "accuracy": acc, "posture_ok": True, "stage": stage})
+                return Response({"message": "Lunge: Excellent! Great depth and form.", "accuracy": acc, "posture_ok": True, "stage": stage, "counter": ls.get("counter", 0)})
             elif is_correct:
-                return Response({"message": "Lunge: Good form! Lower your front knee to 90 degrees.", "accuracy": acc, "posture_ok": True, "stage": stage})
+                return Response({"message": "Lunge: Good form! Lower your front knee to 90 degrees.", "accuracy": acc, "posture_ok": True, "stage": stage, "counter": ls.get("counter", 0)})
             else:
-                return Response({"message": "Lunge: Keep your front knee over your toes and step further forward.", "accuracy": max(40, int(err_conf * 60)), "posture_ok": False, "stage": stage})
+                return Response({"message": "Lunge: Keep your front knee over your toes and step further forward.", "accuracy": max(40, int(err_conf * 60)), "posture_ok": False, "stage": stage, "counter": ls.get("counter", 0)})
 
         # Simple geometric coaching for hand raise (no ML). Dynamic accuracy 0–100.
         if ex_type == "hand_raise":
