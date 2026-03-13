@@ -104,10 +104,10 @@ export default function ExerciseLanding({ onNavigate }) {
           gap: "16px", marginBottom: "40px",
         }}>
           {[
-            { icon: "🏆", label: "Exercises Available", value: "6"      },
-            { icon: "🤖", label: "AI Model",            value: "Active" },
-            { icon: "📡", label: "Live Analysis",       value: "Ready"  },
-            { icon: "🎯", label: "Pose Tracking",       value: "On"     },
+            { icon: "", label: "Exercises Available", value: "6"      },
+            { icon: "", label: "AI Model",            value: "Active" },
+            { icon: "", label: "Live Analysis",       value: "Ready"  },
+            { icon: "", label: "Pose Tracking",       value: "On"     },
           ].map((s, i) => (
             <div key={i} style={{
               padding: "18px 20px",
@@ -128,7 +128,7 @@ export default function ExerciseLanding({ onNavigate }) {
         {/* SECTION TITLE */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
           <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: "white" }}>Choose Your Exercise</h2>
-          <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.35)" }}>6 exercises available</span>
+          
         </div>
 
         {/* EXERCISE GRID */}
@@ -140,8 +140,8 @@ export default function ExerciseLanding({ onNavigate }) {
             const c = EXERCISE_COLORS[ex.id] || { color: "rgba(255,255,255,0.08)", border: "rgba(255,255,255,0.15)", shadow: "rgba(0,0,0,0.2)" };
             const isHovered = hovered === ex.id;
             return (
+              <div key={ex.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
               <button
-                key={ex.id}
                 type="button"
                 onMouseEnter={() => setHovered(ex.id)}
                 onMouseLeave={() => setHovered(null)}
@@ -149,7 +149,7 @@ export default function ExerciseLanding({ onNavigate }) {
                 style={{
                   display: "flex", flexDirection: "column",
                   alignItems: "center", justifyContent: "center",
-                  gap: "14px", padding: "36px 24px",
+                  gap: "0px", padding: "0px", overflow: "hidden",
                   background: isHovered ? c.color : "rgba(255,255,255,0.04)",
                   borderRadius: "18px",
                   border: `1px solid ${isHovered ? c.border : "rgba(255,255,255,0.08)"}`,
@@ -157,19 +157,28 @@ export default function ExerciseLanding({ onNavigate }) {
                   transition: "all 0.2s ease",
                   transform: isHovered ? "translateY(-4px)" : "none",
                   boxShadow: isHovered ? `0 16px 40px ${c.shadow}` : "none",
-                  minHeight: "180px",
+                  height: "200px", minHeight: "unset",
                 }}>
-                <span style={{ fontSize: "3.2rem", lineHeight: 1 }}>{ex.emoji}</span>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "18px", fontWeight: "700", marginBottom: "6px" }}>{ex.name}</div>
-                  <div style={{
-                    fontSize: "13px", padding: "3px 12px",
-                    background: "rgba(255,255,255,0.08)",
-                    borderRadius: "20px", color: "rgba(255,255,255,0.6)",
-                    display: "inline-block",
-                  }}>{ex.short}</div>
-                </div>
+                <img
+                  src={ex.imageUrl}
+                  alt={ex.name}
+                  style={{
+                    width: "100%",
+                    height: "200px",
+                    objectFit: "contain",
+                    objectPosition: "center",
+                    borderRadius: "12px 12px 12px 12px",
+                    display: "block",
+                    backgroundColor: "white",
+                  }}
+                />
+
               </button>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "16px", fontWeight: "700", color: "white" }}>{ex.name}</div>
+                <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", marginTop: "3px" }}>{ex.short}</div>
+              </div>
+              </div>
             );
           })}
         </div>
