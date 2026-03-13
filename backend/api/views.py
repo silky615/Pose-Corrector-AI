@@ -2508,11 +2508,11 @@ def stream_process(request):
             l_wrist_x = _gx("LEFT_WRIST"); r_wrist_x = _gx("RIGHT_WRIST")
             wrist_spread = abs(l_wrist_x - r_wrist_x)
             # Overhead: both wrists clearly above shoulders (y smaller = higher on screen)
-            arms_overhead = best_wrist_y < avg_shldr_y - 0.05
+            arms_overhead = best_wrist_y < avg_shldr_y + 0.3  # world coords: y increases downward, wrists above shoulders = smaller y
             # Prayer: wrists close together AND above hips
             l_hip_y = _gy("LEFT_HIP"); r_hip_y = _gy("RIGHT_HIP")
             avg_hip_y = (l_hip_y + r_hip_y) / 2
-            arms_prayer = wrist_spread < 0.20 and best_wrist_y < avg_shldr_y + 0.05
+            arms_prayer = wrist_spread < 0.20 and best_wrist_y < avg_shldr_y + 0.5
             arms_ok = arms_overhead or arms_prayer
             print(f"[TREE ARMS] overhead={arms_overhead} prayer={arms_prayer} spread={wrist_spread:.3f} best_wrist_y={best_wrist_y:.3f} avg_shldr_y={avg_shldr_y:.3f}", flush=True)
             if not arms_ok:

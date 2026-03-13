@@ -125,8 +125,8 @@ export default function ProfilePage({ onNavigate }) {
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {[
                     { label: "Age", value: age, setter: setAge, unit: "yrs" },
-                    { label: "Height", value: height, setter: setHeight, unit: "ft" },
-                    { label: "Weight", value: weight, setter: setWeight, unit: "kg" },
+                    { label: "Height (inches)", value: height, setter: setHeight, unit: "in" },
+                    { label: "Weight (lb)", value: weight, setter: setWeight, unit: "lb" },
                   ].map((field) => (
                     <div key={field.label} style={{
                       background: "rgba(255,255,255,0.06)", borderRadius: 8,
