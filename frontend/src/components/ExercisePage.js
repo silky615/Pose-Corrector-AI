@@ -73,6 +73,26 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   const postureOkRef = useRef(undefined);
   const sessionIdRef = useRef(null);
   const repAccuraciesRef = useRef([]);
+  const lastSpokenRef = useRef("");
+  const lastSpokenTimeRef = useRef(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const isMutedRef = useRef(false);
+
+  function speak(text) {
+    if (isMutedRef.current) return;
+    const now = Date.now();
+    if (text === lastSpokenRef.current && now - lastSpokenTimeRef.current < 4000) return;
+    lastSpokenRef.current = text;
+    lastSpokenTimeRef.current = now;
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      u.volume = 1.0;
+      window.speechSynthesis.speak(u);
+    }
+  }
   const maxCounterRef = useRef(0);
   const plankIntervalRef = useRef(null);
   const plankSecondsRef = useRef(0);
@@ -101,7 +121,10 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
       .then((mediaStream) => {
         s = mediaStream;
         setStream(mediaStream);
-        if (videoRef.current) videoRef.current.srcObject = mediaStream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+          videoRef.current.play().catch(() => {});
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -148,6 +171,8 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                 if (!cancelled) {
                   setLiveFeedback(data);
                   postureOkRef.current = data.posture_ok;
+                  const msg = data.message || (data.posture_ok ? "Good form" : "Adjust your form");
+                  speak(msg);
                   if (exerciseId === "plank" || exerciseId === "tree-pose") {
                     if (data.posture_ok) {
                       if (!plankIntervalRef.current) {
@@ -468,12 +493,17 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
             {analyzing && <p className="exercise-analyzing">⏳ Starting camera & loading pose model…</p>}
             {liveError && <p style={{ color:"#fca5a5" }}>{liveError}</p>}
             <div className={`exercise-video-container${liveFeedback ? (liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect") : ""}`}>
-              <video ref={videoRef} className="exercise-video" autoPlay playsInline muted />
+              <video ref={videoRef} className="exercise-video" autoPlay playsInline muted webkit-playsinline="true" style={{width:"100%", height:"100%", objectFit:"cover", display:"block"}} />
               <canvas ref={canvasRef} className="exercise-pose-canvas" />
             </div>
             {liveFeedback && (
               <div className={`exercise-feedback${liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect"}`}>
-                <p className="exercise-feedback-message">{liveFeedback.message || (liveFeedback.posture_ok ? "✅ Good form!" : "⚠️ Adjust your form")}</p>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
+                  <p className="exercise-feedback-message" style={{margin:0}}>{liveFeedback.message || (liveFeedback.posture_ok ? "✅ Good form!" : "⚠️ Adjust your form")}</p>
+                  <button type="button" onClick={() => { isMutedRef.current = !isMutedRef.current; setIsMuted(isMutedRef.current); window.speechSynthesis.cancel(); }} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:"8px", color:"white", padding:"4px 10px", fontSize:"13px", cursor:"pointer" }}>
+                    {isMuted ? "🔇 Unmute" : "🔊 Mute"}
+                  </button>
+                </div>
                 {liveFeedback.accuracy != null && <p className="exercise-feedback-accuracy">Accuracy: {Math.round(liveFeedback.accuracy)}%</p>}
                 {(exerciseId === "plank" || exerciseId === "tree-pose") && (
                   <p className="exercise-feedback-counter" style={{fontSize:"20px", fontWeight:"700", color: liveFeedback.posture_ok ? "#4ade80" : "#fca5a5"}}>

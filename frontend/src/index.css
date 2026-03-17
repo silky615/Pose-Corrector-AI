@@ -831,3 +831,24 @@ html, body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; }
   .profile-summary-item .profile-summary-score { grid-column: 2; }
 }
 
+
+/* Landing page responsive - override inline styles via parent selectors */
+@media (max-width: 768px) {
+  /* Stats bar: 2 cols */
+  .landing-page-main > div:nth-child(2) { grid-template-columns: repeat(2, 1fr) !important; }
+  /* Exercise grid: 2 cols */
+  .landing-page-main > div:nth-child(4) { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+  /* Tips grid: 2 cols */
+  .landing-page-main > div:last-child > div { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* Landing page responsive */
+@media (max-width: 768px) {
+  .landing-stats { grid-template-columns: repeat(2, 1fr) !important; }
+  .landing-exercise-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+  .landing-tips-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 400px) {
+  .landing-exercise-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .landing-tips-grid { grid-template-columns: 1fr !important; }
+}

@@ -53,18 +53,18 @@ export default function SignIn({ onNavigate }) {
     <div style={{
       minHeight: "100vh", width: "100vw",
       background: "radial-gradient(1200px 600px at 10% 20%, rgba(124,58,237,0.12), transparent), radial-gradient(800px 400px at 90% 80%, rgba(6,182,212,0.08), transparent), linear-gradient(180deg,#0f172a,#0b3140)",
-      display: "flex", alignItems: "stretch",
+      display: "flex", alignItems: "stretch", flexWrap: "wrap",
       fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
-      color: "#e6f7f9", overflow: "hidden", margin: 0, padding: 0,
+      color: "#e6f7f9", overflowX: "hidden", margin: 0, padding: 0,
     }}>
 
       {/* ── LEFT PANEL ── */}
       <div style={{
-        flex: "1 1 50%",
+        flex: "1 1 300px",
         background: "linear-gradient(145deg, rgba(124,58,237,0.3), rgba(6,182,212,0.1))",
         borderRight: "1px solid rgba(255,255,255,0.07)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "60px 56px", minHeight: "100vh",
+        padding: "clamp(32px, 6vw, 60px) clamp(24px, 6vw, 56px)", minHeight: "auto",
       }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "28px", maxWidth: "480px", width: "100%" }}>
 
@@ -78,7 +78,7 @@ export default function SignIn({ onNavigate }) {
               boxShadow: "0 8px 30px rgba(124,58,237,0.4)", flexShrink: 0,
             }}>PC</div>
             <div>
-              <h1 style={{ margin: 0, fontSize: "26px", fontWeight: "700", color: "white" }}>Pose Corrector AI</h1>
+              <h1 style={{ margin: 0, fontSize: "clamp(18px, 4vw, 26px)", fontWeight: "700", color: "white" }}>Pose Corrector AI</h1>
               <p style={{ margin: "5px 0 0", fontSize: "16px", color: "rgba(255,255,255,0.5)" }}>
                 Exercise form feedback — smarter, safer, stronger!
               </p>
@@ -87,7 +87,7 @@ export default function SignIn({ onNavigate }) {
 
           {/* Tagline */}
           <div>
-            <h2 style={{ margin: "0 0 12px", fontSize: "38px", fontWeight: "800", color: "white", lineHeight: 1.2 }}>
+            <h2 style={{ margin: "0 0 12px", fontSize: "clamp(26px, 5vw, 38px)", fontWeight: "800", color: "white", lineHeight: 1.2 }}>
               Train smarter,<br />
               <span style={{ background: "linear-gradient(90deg, #7c3aed, #06b6d4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 not harder.
@@ -136,9 +136,9 @@ export default function SignIn({ onNavigate }) {
 
       {/* ── RIGHT PANEL ── */}
       <div style={{
-        flex: "1 1 50%", background: "rgba(11,18,33,0.98)",
+        flex: "1 1 300px", background: "rgba(11,18,33,0.98)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "60px 56px", minHeight: "100vh",
+        padding: "clamp(32px, 6vw, 60px) clamp(24px, 6vw, 56px)", minHeight: "auto",
       }}>
         <div style={{ width: "100%", maxWidth: "440px" }}>
 

@@ -50,7 +50,7 @@ export default function ExerciseLanding({ onNavigate }) {
       {/* TOP NAV */}
       <header style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "14px 32px",
+        padding: "14px clamp(14px, 4vw, 32px)",
         background: "rgba(15,23,42,0.85)",
         backdropFilter: "blur(12px)",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
@@ -83,13 +83,13 @@ export default function ExerciseLanding({ onNavigate }) {
 
       <main style={{
         flex: 1, maxWidth: "1200px", width: "100%",
-        margin: "0 auto", padding: "40px 32px 48px", boxSizing: "border-box",
+        margin: "0 auto", padding: "clamp(20px, 4vw, 40px) clamp(16px, 4vw, 32px) 48px", boxSizing: "border-box",
       }}>
 
         {/* HERO */}
         <div style={{ marginBottom: "36px" }}>
           <h1 style={{
-            margin: "0 0 8px", fontSize: "36px", fontWeight: "800",
+            margin: "0 0 8px", fontSize: "clamp(22px, 5vw, 36px)", fontWeight: "800",
             background: "linear-gradient(135deg, #e6f7f9, #bcd4d9)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           }}>Welcome back, {welcomeName}! 👋</h1>
@@ -99,7 +99,7 @@ export default function ExerciseLanding({ onNavigate }) {
         </div>
 
         {/* STATS BAR */}
-        <div style={{
+        <div className="landing-stats" style={{
           display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
           gap: "16px", marginBottom: "40px",
         }}>
@@ -132,7 +132,7 @@ export default function ExerciseLanding({ onNavigate }) {
         </div>
 
         {/* EXERCISE GRID */}
-        <div style={{
+        <div className="landing-exercise-grid" style={{
           display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
           gap: "20px", marginBottom: "48px",
         }}>
@@ -188,7 +188,7 @@ export default function ExerciseLanding({ onNavigate }) {
           <h2 style={{ margin: "0 0 20px", fontSize: "20px", fontWeight: "700", color: "white" }}>
             💡 Tips for Best Results
           </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
+          <div className="landing-tips-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
             {tips.map((t, i) => (
               <div key={i} style={{
                 padding: "20px",
