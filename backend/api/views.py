@@ -2717,6 +2717,59 @@ def upload_video(request):
             except Exception as db_err:
                 print(f"DB save error (non-fatal): {db_err}")
 
+        # Smart accuracy-based suggestions per exercise
+        def get_suggestions(ex_type, acc):
+            tips = {
+                "tree_pose": {
+                    "low":    ["Focus on a fixed point ahead to improve balance.", "Keep your standing leg fully straight.", "Press your foot firmly against your inner thigh, not the knee."],
+                    "mid":    ["Try raising your arms overhead for a deeper stretch.", "Engage your core to hold longer.", "Try to extend hold time beyond 30 seconds."],
+                    "high":   ["Excellent balance! Try closing your eyes for an advanced challenge.", "Try holding for 60+ seconds for mastery.", "Focus on keeping hips perfectly level."],
+                },
+                "plank": {
+                    "low":    ["Keep your hips level — don't let them sag or rise.", "Engage your core and glutes throughout.", "Look down at the floor to keep neck neutral."],
+                    "mid":    ["Breathe steadily — don't hold your breath.", "Try to extend your hold time gradually.", "Keep shoulders directly over wrists."],
+                    "high":   ["Great plank! Try adding shoulder taps for more challenge.", "Aim for 60+ second holds consistently.", "Focus on full body tension from head to toe."],
+                },
+                "bicep_curl": {
+                    "low":    ["Keep your elbows pinned to your sides — don't swing.", "Use a controlled motion, especially on the way down.", "Avoid using momentum — slow down the movement."],
+                    "mid":    ["Squeeze at the top of each rep for maximum contraction.", "Try slowing the eccentric (lowering) phase to 3 seconds.", "Keep your wrists straight throughout."],
+                    "high":   ["Great form! Try increasing weight for progressive overload.", "Add a pause at the top for extra intensity.", "Try alternating arms for better isolation."],
+                },
+                "squat": {
+                    "low":    ["Keep your knees tracking over your toes — don't let them cave in.", "Push your hips back first before bending knees.", "Keep your chest up and back straight."],
+                    "mid":    ["Try to reach parallel depth or below for full range.", "Drive through your heels as you stand up.", "Keep weight evenly distributed across both feet."],
+                    "high":   ["Excellent squat form! Try adding weight for progression.", "Focus on a controlled 3-second descent.", "Try pause squats at the bottom for extra strength."],
+                },
+                "pushup": {
+                    "low":    ["Keep your body in a straight line — no sagging hips.", "Lower your chest all the way to the floor.", "Keep elbows at 45 degrees, not flared wide."],
+                    "mid":    ["Focus on full range of motion — chest to floor.", "Squeeze your glutes and core throughout.", "Try slowing down the descent to 3 seconds."],
+                    "high":   ["Great push-up form! Try diamond push-ups for variation.", "Add a pause at the bottom for extra challenge.", "Try archer push-ups for unilateral strength."],
+                },
+                "lunge": {
+                    "low":    ["Keep your front knee above your ankle, not past your toes.", "Stand tall — don't lean forward.", "Lower your back knee straight down toward the floor."],
+                    "mid":    ["Keep your torso upright throughout the movement.", "Take a longer stride for better range of motion.", "Focus on pushing through the front heel to stand up."],
+                    "high":   ["Great lunges! Try adding weights for progression.", "Try walking lunges for more dynamic challenge.", "Focus on keeping hips square throughout."],
+                },
+            }
+            ex_tips = tips.get(ex_type, {})
+            if acc < 60:
+                return ex_tips.get("low", [])
+            elif acc < 85:
+                return ex_tips.get("mid", [])
+            else:
+                return ex_tips.get("high", [])
+
+        suggestions = get_suggestions(exercise_type, accuracy)
+
+        if accuracy >= 90:
+            overall_feedback = "Excellent form! Keep it up! 🏆"
+        elif accuracy >= 75:
+            overall_feedback = "Good form! Small improvements will get you to perfect."
+        elif accuracy >= 60:
+            overall_feedback = "Decent effort! Focus on the tips below to improve."
+        else:
+            overall_feedback = "Keep practicing! Use the suggestions below to improve your form."
+
         response_data = {
             "type": exercise_type,
             "processed": True,
@@ -2725,6 +2778,8 @@ def upload_video(request):
             "posture_ok": posture_ok,
             "accuracy": accuracy,
             "message": feedback_message or "Analysis complete",
+            "feedback": overall_feedback,
+            "suggestions": suggestions,
         }
 
         if exercise_type in ["squat", "lunge", "bicep_curl"]:
@@ -2901,8 +2956,29 @@ def reset_password_confirm(request):
         return JsonResponse({"error": str(e)}, status=400)
 
 
+# ─── Direct password reset by email ───────────────────────────────────────────
+@api_view(["POST"])
+def reset_password_by_email(request):
+    from api.models import User
+    from django.contrib.auth.hashers import make_password
+    email = request.data.get("email", "").strip().lower()
+    new_password = request.data.get("new_password", "")
+    if not email or not new_password:
+        return JsonResponse({"error": "Email and new password required"}, status=400)
+    if len(new_password) < 6:
+        return JsonResponse({"error": "Password must be at least 6 characters"}, status=400)
+    try:
+        user = User.objects.get(email__iexact=email)
+        user.password_hash = make_password(new_password)
+        user.save(update_fields=["password_hash"])
+        return JsonResponse({"success": True})
+    except User.DoesNotExist:
+        return JsonResponse({"error": "No account found with that email address"}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
 # ─── Profile (stats + recent workouts) ────────────────────────────────────────
-@api_view(["GET"])
+@api_view(["GET", "POST"])
 def profile(request):
     from api.models import User, Session
     from django.utils import timezone

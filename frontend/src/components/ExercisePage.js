@@ -313,10 +313,50 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
         ? Math.round(accuracies.reduce((a,b) => a+b, 0) / accuracies.length) : 0;
 
       const holdSeconds = Math.round(goodFrames * frameInterval);
+      const tipsByExercise = {
+        "tree-pose": {
+          low:  ["Focus on a fixed point ahead to improve balance.", "Keep your standing leg fully straight.", "Press your foot firmly against your inner thigh, not the knee."],
+          mid:  ["Try raising your arms overhead for a deeper stretch.", "Engage your core to hold longer.", "Try to extend hold time beyond 30 seconds."],
+          high: ["Excellent balance! Try closing your eyes for an advanced challenge.", "Try holding for 60+ seconds for mastery.", "Focus on keeping hips perfectly level."],
+        },
+        "plank": {
+          low:  ["Keep your hips level — don't let them sag or rise.", "Engage your core and glutes throughout.", "Look down at the floor to keep neck neutral."],
+          mid:  ["Breathe steadily — don't hold your breath.", "Try to extend your hold time gradually.", "Keep shoulders directly over wrists."],
+          high: ["Great plank! Try adding shoulder taps for more challenge.", "Aim for 60+ second holds consistently.", "Focus on full body tension from head to toe."],
+        },
+        "bicep-curl": {
+          low:  ["Keep your elbows pinned to your sides — don't swing.", "Use a controlled motion, especially on the way down.", "Avoid using momentum — slow down the movement."],
+          mid:  ["Squeeze at the top of each rep for maximum contraction.", "Try slowing the eccentric (lowering) phase to 3 seconds.", "Keep your wrists straight throughout."],
+          high: ["Great form! Try increasing weight for progressive overload.", "Add a pause at the top for extra intensity.", "Try alternating arms for better isolation."],
+        },
+        "squat": {
+          low:  ["Keep your knees tracking over your toes — don't let them cave in.", "Push your hips back first before bending knees.", "Keep your chest up and back straight."],
+          mid:  ["Try to reach parallel depth or below for full range.", "Drive through your heels as you stand up.", "Keep weight evenly distributed across both feet."],
+          high: ["Excellent squat form! Try adding weight for progression.", "Focus on a controlled 3-second descent.", "Try pause squats at the bottom for extra strength."],
+        },
+        "pushup": {
+          low:  ["Keep your body in a straight line — no sagging hips.", "Lower your chest all the way to the floor.", "Keep elbows at 45 degrees, not flared wide."],
+          mid:  ["Focus on full range of motion — chest to floor.", "Squeeze your glutes and core throughout.", "Try slowing down the descent to 3 seconds."],
+          high: ["Great push-up form! Try diamond push-ups for variation.", "Add a pause at the bottom for extra challenge.", "Try archer push-ups for unilateral strength."],
+        },
+        "lunges": {
+          low:  ["Keep your front knee above your ankle, not past your toes.", "Stand tall — don't lean forward.", "Lower your back knee straight down toward the floor."],
+          mid:  ["Keep your torso upright throughout the movement.", "Take a longer stride for better range of motion.", "Focus on pushing through the front heel to stand up."],
+          high: ["Great lunges! Try adding weights for progression.", "Try walking lunges for more dynamic challenge.", "Focus on keeping hips square throughout."],
+        },
+      };
+      const exTips = tipsByExercise[exerciseId] || {};
+      const suggestions = avgAccuracy < 60 ? exTips.low || [] : avgAccuracy < 85 ? exTips.mid || [] : exTips.high || [];
+      const feedback = avgAccuracy >= 90 ? "Excellent form! Keep it up!"
+        : avgAccuracy >= 75 ? "Good form! Small improvements will get you to perfect."
+        : avgAccuracy >= 60 ? "Decent effort! Focus on the tips below to improve."
+        : "Keep practicing! Use the suggestions below to improve your form.";
+
       const result = {
         total_reps: (exerciseId === "plank" || exerciseId === "tree-pose") ? holdSeconds : maxReps,
         avg_accuracy: avgAccuracy,
-        feedback: avgAccuracy >= 70 ? "Great form overall!" : "Keep practicing to improve your form."
+        feedback: feedback,
+        suggestions: suggestions,
       };
       setUploadResult(result);
       setUploadSuccess(true);
@@ -488,37 +528,55 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
         {/* LIVE MODE */}
         {mode === "live" && (
           <div className="exercise-live-wrap">
-
             <h2 style={{ margin:"0 0 16px", fontSize:"22px", fontWeight:"700", color:"white" }}>{exercise.name} — Live</h2>
             {analyzing && <p className="exercise-analyzing">⏳ Starting camera & loading pose model…</p>}
             {liveError && <p style={{ color:"#fca5a5" }}>{liveError}</p>}
-            <div className={`exercise-video-container${liveFeedback ? (liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect") : ""}`}>
-              <video ref={videoRef} className="exercise-video" autoPlay playsInline muted webkit-playsinline="true" style={{width:"100%", height:"100%", objectFit:"cover", display:"block"}} />
-              <canvas ref={canvasRef} className="exercise-pose-canvas" />
-            </div>
-            {liveFeedback && (
-              <div className={`exercise-feedback${liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect"}`}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
-                  <p className="exercise-feedback-message" style={{margin:0}}>{liveFeedback.message || (liveFeedback.posture_ok ? "✅ Good form!" : "⚠️ Adjust your form")}</p>
-                  <button type="button" onClick={() => { isMutedRef.current = !isMutedRef.current; setIsMuted(isMutedRef.current); window.speechSynthesis.cancel(); }} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:"8px", color:"white", padding:"4px 10px", fontSize:"13px", cursor:"pointer" }}>
-                    {isMuted ? "🔇 Unmute" : "🔊 Mute"}
-                  </button>
+            <div style={{ display:"flex", flexDirection:"row", gap:"16px", alignItems:"stretch" }}>
+              <div style={{ flex:"1 1 65%", minWidth:0, display:"flex", flexDirection:"column", gap:"12px" }}>
+                <div className={`exercise-video-container${liveFeedback ? (liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect") : ""}`} style={{ height:"60vh", width:"100%", maxWidth:"none", borderRadius:"12px", overflow:"hidden", position:"relative" }}>
+                  <video ref={videoRef} className="exercise-video" autoPlay playsInline muted webkit-playsinline="true" style={{width:"100%", height:"100%", objectFit:"cover", display:"block"}} />
+                  <canvas ref={canvasRef} className="exercise-pose-canvas" />
                 </div>
-                {liveFeedback.accuracy != null && <p className="exercise-feedback-accuracy">Accuracy: {Math.round(liveFeedback.accuracy)}%</p>}
-                {(exerciseId === "plank" || exerciseId === "tree-pose") && (
-                  <p className="exercise-feedback-counter" style={{fontSize:"20px", fontWeight:"700", color: liveFeedback.posture_ok ? "#4ade80" : "#fca5a5"}}>
-                    ⏱ {Math.floor(plankSeconds / 60).toString().padStart(2,"0")}:{(plankSeconds % 60).toString().padStart(2,"0")}
-                    <button type="button" className="btn ghost" onClick={() => { plankSecondsRef.current = 0; setPlankSeconds(0); }} style={{ marginLeft:"12px", fontSize:"12px", padding:"3px 10px", minWidth:"auto" }}>Reset</button>
-                  </p>
-                )}
-                {liveFeedback.counter != null && (
-                  <p className="exercise-feedback-counter">
-                    Reps: {liveFeedback.counter}
-                    <button type="button" className="btn ghost" onClick={handleResetCounter} style={{ marginLeft:"12px", fontSize:"12px", padding:"3px 10px", minWidth:"auto" }}>Reset</button>
-                  </p>
+                {liveFeedback && (
+                  <div className={`exercise-feedback${liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect"}`} style={{ width:"100%", maxWidth:"none" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
+                      <p className="exercise-feedback-message" style={{margin:0}}>{liveFeedback.message || (liveFeedback.posture_ok ? "✅ Good form!" : "⚠️ Adjust your form")}</p>
+                      <button type="button" onClick={() => { isMutedRef.current = !isMutedRef.current; setIsMuted(isMutedRef.current); window.speechSynthesis.cancel(); }} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:"8px", color:"white", padding:"4px 10px", fontSize:"13px", cursor:"pointer" }}>
+                        {isMuted ? "🔇 Unmute" : "🔊 Mute"}
+                      </button>
+                    </div>
+                    {liveFeedback.accuracy != null && <p className="exercise-feedback-accuracy">Accuracy: {Math.round(liveFeedback.accuracy)}%</p>}
+                    {(exerciseId === "plank" || exerciseId === "tree-pose") && (
+                      <p className="exercise-feedback-counter" style={{fontSize:"20px", fontWeight:"700", color: liveFeedback.posture_ok ? "#4ade80" : "#fca5a5"}}>
+                        ⏱ {Math.floor(plankSeconds / 60).toString().padStart(2,"0")}:{(plankSeconds % 60).toString().padStart(2,"0")}
+                        <button type="button" className="btn ghost" onClick={() => { plankSecondsRef.current = 0; setPlankSeconds(0); }} style={{ marginLeft:"12px", fontSize:"12px", padding:"3px 10px", minWidth:"auto" }}>Reset</button>
+                      </p>
+                    )}
+                    {liveFeedback.counter != null && (
+                      <p className="exercise-feedback-counter">
+                        Reps: {liveFeedback.counter}
+                        <button type="button" className="btn ghost" onClick={handleResetCounter} style={{ marginLeft:"12px", fontSize:"12px", padding:"3px 10px", minWidth:"auto" }}>Reset</button>
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+              <div style={{ flex:"1 1 30%", minWidth:"200px", display:"flex", flexDirection:"column", gap:"12px" }}>
+                <p style={{ fontWeight:"600", margin:"0 0 4px", fontSize:"15px", color:"#e2e8f0" }}>💡 Tips for Best Results</p>
+                {[
+                  { icon:"💪", title:"Warm up first", desc:"Spend 5 minutes warming up before any session to prevent injuries." },
+                  { icon:"📸", title:"Good lighting", desc:"Make sure your full body is visible and well-lit for best AI tracking." },
+                  { icon:"👟", title:"Wear fitted clothes", desc:"Fitted clothing helps the AI detect your joints more accurately." },
+                  { icon:"📏", title:"Stand back", desc:"Keep 5–8 feet of distance from the camera for full body detection." },
+                ].map((tip, i) => (
+                  <div key={i} style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:"12px", padding:"16px", flex:1 }}>
+                    <span style={{ fontSize:"22px", display:"block", marginBottom:"8px" }}>{tip.icon}</span>
+                    <p style={{ fontWeight:"600", margin:"0 0 4px", fontSize:"13px", color:"#e2e8f0" }}>{tip.title}</p>
+                    <p style={{ margin:0, fontSize:"12px", color:"#94a3b8", lineHeight:"1.5" }}>{tip.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -548,38 +606,49 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                         : <p className="muted small">Reps detected: {uploadResult.total_reps}</p>
                     )}
                     {uploadResult.avg_accuracy != null && <p className="muted small">Avg accuracy: {Math.round(uploadResult.avg_accuracy)}%</p>}
-                    {uploadResult.feedback && <p className="muted small">{uploadResult.feedback}</p>}
+                    {uploadResult.feedback && <p style={{ margin:"6px 0 0", fontWeight:"600", color: uploadResult.avg_accuracy >= 90 ? "#4ade80" : uploadResult.avg_accuracy >= 75 ? "#06b6d4" : uploadResult.avg_accuracy >= 60 ? "#fbbf24" : "#fca5a5", fontSize:"13px" }}>{uploadResult.feedback}</p>}
+                    {uploadResult.suggestions && uploadResult.suggestions.length > 0 && (
+                      <div style={{ marginTop:"12px", borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:"12px" }}>
+                        <p style={{ margin:"0 0 8px", fontSize:"13px", fontWeight:"600", color:"#e2e8f0" }}>💡 Tips to improve your score:</p>
+                        {uploadResult.suggestions.map((tip, i) => (
+                          <div key={i} style={{ display:"flex", gap:"8px", alignItems:"flex-start", marginBottom:"6px" }}>
+                            <span style={{ color:"#06b6d4", fontWeight:"700", flexShrink:0 }}>→</span>
+                            <p style={{ margin:0, fontSize:"12px", color:"#94a3b8", lineHeight:"1.5" }}>{tip}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
-                <div style={{ borderRadius:"12px", overflow:"hidden", border:"1px solid rgba(255,255,255,0.1)", width:"100%" }}>
-                  <video
-                    id="upload-preview-video"
-                    src={uploadVideoUrl}
-                    muted
-                    style={{ width:"100%", width:"100%", height:"75vh", display:"block", background:"#000", objectFit:"cover" }}
-                  />
-                  {analyzing && (
-                    <div style={{ padding:"10px 16px", background:"rgba(6,182,212,0.08)", display:"flex", alignItems:"center", gap:"12px" }}>
-                      <div style={{ flex:1, height:"6px", background:"rgba(255,255,255,0.1)", borderRadius:"4px", overflow:"hidden" }}>
-                        <div style={{ height:"100%", width:`${uploadProgress}%`, background:"linear-gradient(90deg,#7c3aed,#06b6d4)", borderRadius:"4px", transition:"width 0.3s ease" }} />
+                <div style={{ display:"flex", flexDirection:"row", gap:"16px", alignItems:"stretch" }}>
+                  <div style={{ flex:"1 1 65%", borderRadius:"12px", overflow:"hidden", border:"1px solid rgba(255,255,255,0.1)" }}>
+                    <video
+                      id="upload-preview-video"
+                      src={uploadVideoUrl}
+                      muted
+                      style={{ width:"100%", height:"60vh", display:"block", background:"#000", objectFit:"cover" }}
+                    />
+                    {analyzing && (
+                      <div style={{ padding:"10px 16px", background:"rgba(6,182,212,0.08)", display:"flex", alignItems:"center", gap:"12px" }}>
+                        <div style={{ flex:1, height:"6px", background:"rgba(255,255,255,0.1)", borderRadius:"4px", overflow:"hidden" }}>
+                          <div style={{ height:"100%", width:`${uploadProgress}%`, background:"linear-gradient(90deg,#7c3aed,#06b6d4)", borderRadius:"4px", transition:"width 0.3s ease" }} />
+                        </div>
+                        <span style={{ fontSize:"13px", color:"#67e8f9", whiteSpace:"nowrap" }}>{uploadProgress}%</span>
                       </div>
-                      <span style={{ fontSize:"13px", color:"#67e8f9", whiteSpace:"nowrap" }}>{uploadProgress}%</span>
-                    </div>
-                  )}
-                </div>
-                <div style={{ marginTop:"8px" }}>
-                  <p style={{ fontWeight:"600", marginBottom:"14px", fontSize:"15px", color:"#e2e8f0" }}>💡 Tips for Best Results</p>
-                  <div style={{ display:"flex", flexDirection:"row", gap:"16px", flexWrap:"wrap" }}>
+                    )}
+                  </div>
+                  <div style={{ flex:"1 1 30%", minWidth:"200px", display:"flex", flexDirection:"column", gap:"12px" }}>
+                    <p style={{ fontWeight:"600", margin:"0 0 4px", fontSize:"15px", color:"#e2e8f0" }}>💡 Tips for Best Results</p>
                     {[
                       { icon:"💪", title:"Warm up first", desc:"Spend 5 minutes warming up before any session to prevent injuries." },
                       { icon:"📸", title:"Good lighting", desc:"Make sure your full body is visible and well-lit for best AI tracking." },
                       { icon:"👟", title:"Wear fitted clothes", desc:"Fitted clothing helps the AI detect your joints more accurately." },
                       { icon:"📏", title:"Stand back", desc:"Keep 5–8 feet of distance from the camera for full body detection." },
                     ].map((tip, i) => (
-                      <div key={i} style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:"12px", padding:"20px", flex:"1 1 200px", minWidth:"180px" }}>
-                        <span style={{ fontSize:"28px", display:"block", marginBottom:"10px" }}>{tip.icon}</span>
-                        <p style={{ fontWeight:"600", margin:"0 0 6px", fontSize:"13px", color:"#e2e8f0" }}>{tip.title}</p>
-                        <p style={{ margin:0, fontSize:"12px", color:"#94a3b8", lineHeight:"1.6" }}>{tip.desc}</p>
+                      <div key={i} style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:"12px", padding:"16px", flex:1 }}>
+                        <span style={{ fontSize:"22px", display:"block", marginBottom:"8px" }}>{tip.icon}</span>
+                        <p style={{ fontWeight:"600", margin:"0 0 4px", fontSize:"13px", color:"#e2e8f0" }}>{tip.title}</p>
+                        <p style={{ margin:0, fontSize:"12px", color:"#94a3b8", lineHeight:"1.5" }}>{tip.desc}</p>
                       </div>
                     ))}
                   </div>

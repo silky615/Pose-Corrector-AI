@@ -35,16 +35,25 @@ export default function ProfilePage({ onNavigate }) {
       .catch(() => { setError("Could not load profile data"); setLoading(false); });
   }, [userId]);
 
-  function handleSave() {
-    fetch(`/api/profile`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId, age, height, weight })
-    })
-      .then(r => r.json())
-      .then(() => { setSaveMsg("Saved!"); setTimeout(() => setSaveMsg(""), 2000); })
-      .catch(() => setSaveMsg("Save failed"));
-    setEditing(false);
+  async function handleSave() {
+    try {
+      const r = await fetch(`/api/profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, age, height, weight })
+      });
+      const data = await r.json();
+      if (data.success) {
+        setSaveMsg("Saved successfully!");
+        setEditing(false);
+        setTimeout(() => setSaveMsg(""), 2500);
+      } else {
+        setSaveMsg("Save failed: " + (data.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error("Save error:", err);
+      setSaveMsg("Save failed — please try again.");
+    }
   }
 
   const stats = profileData ? [

@@ -65,6 +65,17 @@ export async function requestPasswordReset(email) {
  * POST /api/auth/reset-confirm
  * Body: { uid, token, new_password }
  */
+export async function resetPasswordByEmail(email, newPassword) {
+  const res = await fetch(getApiUrl("/api/auth/reset-by-email"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, new_password: newPassword }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Reset failed");
+  return data;
+}
+
 export async function resetPasswordWithToken(uid, token, newPassword) {
   const res = await fetch(getApiUrl("/api/auth/reset-confirm"), {
     method: "POST",
@@ -186,6 +197,7 @@ const api = {
   signup,
   requestPasswordReset,
   resetPasswordWithToken,
+  resetPasswordByEmail,
   startSession,
   endSession,
   streamAnalysis,

@@ -44,7 +44,7 @@ export default function SignIn({ onNavigate }) {
 
   const features = [
     { icon: "🤸", title: "Real-time Pose Analysis", desc: "AI tracks your body movements frame by frame" },
-    { icon: "🎯", title: "Form Correction", desc: "Instant feedback on your exercise technique" },
+    { icon: "⚡", title: "Form Correction", desc: "Instant feedback on your exercise technique" },
     { icon: "📊", title: "Progress Tracking", desc: "Monitor your improvement over time" },
     { icon: "💪", title: "6+ Exercises", desc: "Squats, planks, curls, lunges and more" },
   ];

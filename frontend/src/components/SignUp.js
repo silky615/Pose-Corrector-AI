@@ -30,8 +30,8 @@ export default function SignUp({ onNavigate }) {
     if (!form.age || Number(form.age) <= 0) return "Enter a valid age";
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!re.test(form.email)) return "Enter a valid email";
-    if (!form.height || Number(form.height) <= 0) return "Enter a valid height (cm)";
-    if (!form.weight || Number(form.weight) <= 0) return "Enter a valid weight (kg)";
+    if (!form.height || Number(form.height) <= 0) return "Enter a valid height (inches)";
+    if (!form.weight || Number(form.weight) <= 0) return "Enter a valid weight (lbs)";
     if (!form.password || form.password.length < 6) return "Password must be at least 6 characters";
     return "";
   }
@@ -97,7 +97,7 @@ export default function SignUp({ onNavigate }) {
             boxShadow: "0 6px 20px rgba(124,58,237,0.4)",
           }}>PC</div>
           <div>
-            <h2 style={{ margin: 0, fontSize: "26px", fontWeight: "700", color: "white" }}>Create Account 🚀</h2>
+            <h2 style={{ margin: 0, fontSize: "26px", fontWeight: "700", color: "white" }}>Create Account </h2>
             <p style={{ margin: "4px 0 0", fontSize: "15px", color: "rgba(255,255,255,0.4)" }}>
               Fill in your details to get started — it's free!
             </p>
@@ -137,7 +137,7 @@ export default function SignUp({ onNavigate }) {
 
             {/* Height */}
             <div style={labelStyle}>
-              Height (cm)
+              Height (inches)
               <input type="number" value={form.height} onChange={e => update("height", e.target.value)}
                 placeholder="170" min="1" style={inputStyle}
                 onFocus={e => e.target.style.borderColor = '#7c3aed'}
@@ -146,7 +146,7 @@ export default function SignUp({ onNavigate }) {
 
             {/* Weight */}
             <div style={labelStyle}>
-              Weight (kg)
+              Weight (lbs)
               <input type="number" value={form.weight} onChange={e => update("weight", e.target.value)}
                 placeholder="65" min="1" style={inputStyle}
                 onFocus={e => e.target.style.borderColor = '#7c3aed'}
@@ -186,7 +186,7 @@ export default function SignUp({ onNavigate }) {
 
           {/* Submit */}
           <button type="submit" disabled={isLoading} style={{ width: "100%", padding: "17px", background: "linear-gradient(135deg, #7c3aed, #06b6d4)", border: "none", borderRadius: "12px", color: "white", fontSize: "18px", fontWeight: "700", cursor: "pointer", opacity: isLoading ? 0.7 : 1, marginTop: "4px" }}>
-            {isLoading ? "Creating account..." : "Create Account 🚀"}
+            {isLoading ? "Creating account..." : "Create Account "}
           </button>
 
           {/* Divider */}

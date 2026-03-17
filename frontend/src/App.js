@@ -5,6 +5,7 @@ import SignUp from "./components/SignUp";
 import ExerciseLanding from "./components/ExerciseLanding";
 import ExercisePage from "./components/ExercisePage";
 import ProfilePage from "./components/ProfilePage";
+import ResetPassword from "./components/ResetPassword";
 
 export default function App() {
   const [route, setRoute] = useState("signin");
@@ -38,13 +39,14 @@ export default function App() {
   }
 
   const isDashboardLayout = route === "dashboard" || route === "exercise" || route === "profile";
-  const isAuthPage = route === "signin" || route === "signup";
+  const isAuthPage = route === "signin" || route === "signup" || route === "reset-password";
 
   if (isAuthPage) {
     return (
       <>
         {route === "signin" && <SignIn onNavigate={navigate} />}
         {route === "signup" && <SignUp onNavigate={navigate} />}
+        {route === "reset-password" && <ResetPassword onNavigate={navigate} />}
       </>
     );
   }
