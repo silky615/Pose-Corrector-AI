@@ -86,3 +86,28 @@ class ExerciseFeedback(models.Model):
 
     def __str__(self):
         return f"Feedback — Session {self.session_id} — {'OK' if self.posture_ok else 'BAD'}"
+
+
+import datetime
+from django.utils import timezone
+
+class OTPVerification(models.Model):
+    first_name    = models.CharField(max_length=100)
+    last_name     = models.CharField(max_length=100, blank=True)
+    email         = models.EmailField()
+    password_hash = models.CharField(max_length=255)
+    age           = models.IntegerField(null=True, blank=True)
+    height        = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    weight        = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    otp_code      = models.CharField(max_length=6)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    is_used       = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'otp_verifications'
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + datetime.timedelta(minutes=10)
+
+    def __str__(self):
+        return f"OTP for {self.email} — {'used' if self.is_used else 'pending'}"

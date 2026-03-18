@@ -3103,3 +3103,91 @@ def end_session(request):
         return JsonResponse({"error": "Session not found"}, status=404)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+
+# ─── Send OTP ────────────────────────────────────────────────────────────────
+import random, string
+from django.core.mail import send_mail
+
+@api_view(["POST"])
+def send_otp(request):
+    from api.models import User, OTPVerification
+    data       = request.data
+    email      = data.get("email", "").strip().lower()
+    first_name = data.get("firstName", "").strip()
+    last_name  = data.get("lastName", "").strip()
+    password   = data.get("password", "")
+    age        = data.get("age") or None
+    height     = data.get("height") or None
+    weight     = data.get("weight") or None
+
+    if not email or not first_name or not password:
+        return JsonResponse({"error": "Full name, email and password are required."}, status=400)
+    if User.objects.filter(email=email).exists():
+        return JsonResponse({"error": "An account with this email already exists."}, status=400)
+
+    otp_code = ''.join(random.choices(string.digits, k=6))
+    OTPVerification.objects.filter(email=email, is_used=False).delete()
+    OTPVerification.objects.create(
+        first_name=first_name, last_name=last_name, email=email,
+        password_hash=make_password(password),
+        age=age, height=height, weight=weight, otp_code=otp_code,
+    )
+
+    try:
+        send_mail(
+            subject="Your Pose Corrector AI verification code",
+            message=f"Hi {first_name},\n\nYour verification code is: {otp_code}\n\nThis code expires in 10 minutes.\n\n— Pose Corrector AI Team",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+        )
+    except Exception as e:
+        return JsonResponse({"error": f"Failed to send email: {str(e)}"}, status=500)
+
+    return JsonResponse({"success": True, "message": "Verification code sent! Check your email."})
+
+
+# ─── Verify OTP ───────────────────────────────────────────────────────────────
+@api_view(["POST"])
+def verify_otp(request):
+    from api.models import User, OTPVerification
+    email    = request.data.get("email", "").strip().lower()
+    otp_code = request.data.get("otp_code", "").strip()
+
+    if not email or not otp_code:
+        return JsonResponse({"error": "Email and verification code are required."}, status=400)
+
+    try:
+        record = OTPVerification.objects.filter(email=email, is_used=False).latest("created_at")
+    except OTPVerification.DoesNotExist:
+        return JsonResponse({"error": "No verification code found. Please sign up again."}, status=400)
+
+    if record.is_expired():
+        return JsonResponse({"error": "Code has expired. Please sign up again."}, status=400)
+    if record.otp_code != otp_code:
+        return JsonResponse({"error": "Incorrect code. Please try again."}, status=400)
+
+    try:
+        if User.objects.filter(email=email).exists():
+            return JsonResponse({"error": "An account with this email already exists."}, status=400)
+        user = User.objects.create(
+            first_name=record.first_name, last_name=record.last_name,
+            email=email, password_hash=record.password_hash,
+            age=record.age, height=record.height, weight=record.weight,
+        )
+        record.is_used = True
+        record.save()
+        try:
+            send_mail(
+                subject="Welcome to Pose Corrector AI!",
+                message=f"Hi {user.first_name},\n\nYour account has been successfully created!\n\nYou can now sign in and start correcting your exercise form.\n\n— Pose Corrector AI Team",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+        return JsonResponse({"success": True, "user_id": user.id, "name": user.first_name, "email": user.email})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
