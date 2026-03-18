@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { EXERCISES } from "../data/exercises";
+import * as api from "../api";
 
 const EXERCISE_COLORS = {
   "tree-pose":  { color: "rgba(124,58,237,0.25)",  border: "rgba(124,58,237,0.4)",  shadow: "rgba(124,58,237,0.2)"  },
@@ -23,6 +24,24 @@ export default function ExerciseLanding({ onNavigate }) {
   const displayName = useState(() =>
     localStorage.getItem("pc_demo_username") || localStorage.getItem("pc_demo_email") || ""
   )[0];
+
+  const [userStats, setUserStats] = useState({ total: "—", streak: "—", score: "—", lastEx: "—" });
+
+  useEffect(() => {
+    const userId = localStorage.getItem("pc_demo_user_id");
+    if (!userId) return;
+    fetch(`/api/profile?user_id=${userId}`)
+      .then(r => r.json())
+      .then(data => {
+        setUserStats({
+          total: data.totalWorkouts ?? "—",
+          streak: data.streakDays ?? "—",
+          score: data.avgScore != null ? Math.round(data.avgScore) + "%" : "—",
+          lastEx: data.recentWorkouts?.[0]?.exercise_type?.replace(/_/g," ") || "None",
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   function handleSignOut() {
     localStorage.removeItem("pc_demo_email");
@@ -104,21 +123,21 @@ export default function ExerciseLanding({ onNavigate }) {
           gap: "16px", marginBottom: "40px",
         }}>
           {[
-            { icon: "", label: "Exercises Available", value: "6"      },
-            { icon: "", label: "AI Model",            value: "Active" },
-            { icon: "", label: "Live Analysis",       value: "Ready"  },
-            { icon: "", label: "Pose Tracking",       value: "On"     },
+            { icon: "🏆", label: "Total Workouts", value: userStats.total,  color: "#6366f1" },
+            { icon: "🔥", label: "Day Streak",     value: userStats.streak !== "—" ? userStats.streak + " days" : "—", color: "#ef4444" },
+            { icon: "⭐", label: "Avg Accuracy",   value: userStats.score,  color: "#eab308" },
+            { icon: "📅", label: "Last Exercise",  value: userStats.lastEx, color: "#06b6d4" },
           ].map((s, i) => (
             <div key={i} style={{
               padding: "18px 20px",
               background: "rgba(255,255,255,0.04)",
               borderRadius: "14px",
-              border: "1px solid rgba(255,255,255,0.07)",
+              border: `1px solid ${s.color}80`,
               display: "flex", alignItems: "center", gap: "14px",
             }}>
               <span style={{ fontSize: "26px" }}>{s.icon}</span>
               <div>
-                <div style={{ fontSize: "20px", fontWeight: "700", color: "white" }}>{s.value}</div>
+                <div style={{ fontSize: "20px", fontWeight: "700", color: s.color }}>{s.value}</div>
                 <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>{s.label}</div>
               </div>
             </div>

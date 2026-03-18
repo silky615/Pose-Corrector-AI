@@ -419,7 +419,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
         {/* TOP: image left, info right */}
         {!mode && (
           <>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"40px", marginBottom:"36px", alignItems:"start" }}>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(280px, 1fr))", gap:"24px", marginBottom:"36px", alignItems:"start" }}>
 
               {/* IMAGE */}
               <div style={{ position:"relative", borderRadius:"18px", overflow:"hidden", border:"1px solid rgba(255,255,255,0.08)", background:"rgba(0,0,0,0.2)", aspectRatio:"4/3" }}>
@@ -464,8 +464,8 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                     ].map((s, i) => (
                       <div key={i} style={{ padding:"14px 10px", background:"rgba(255,255,255,0.05)", borderRadius:"12px", border:"1px solid rgba(255,255,255,0.07)", textAlign:"center" }}>
                         <div style={{ fontSize:"20px", marginBottom:"6px" }}>{s.icon}</div>
-                        <div style={{ fontSize:"15px", fontWeight:"700", color:"white" }}>{s.value}</div>
-                        <div style={{ fontSize:"12px", color:"rgba(255,255,255,0.35)", marginTop:"2px" }}>{s.label}</div>
+                        <div style={{ fontSize:"clamp(12px,3vw,15px)", fontWeight:"700", color:"white" }}>{s.value}</div>
+                        <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.35)", marginTop:"2px" }}>{s.label}</div>
                       </div>
                     ))}
                   </div>
@@ -531,8 +531,8 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
             <h2 style={{ margin:"0 0 16px", fontSize:"22px", fontWeight:"700", color:"white" }}>{exercise.name} — Live</h2>
             {analyzing && <p className="exercise-analyzing">⏳ Starting camera & loading pose model…</p>}
             {liveError && <p style={{ color:"#fca5a5" }}>{liveError}</p>}
-            <div style={{ display:"flex", flexDirection:"row", gap:"16px", alignItems:"stretch" }}>
-              <div style={{ flex:"1 1 65%", minWidth:0, display:"flex", flexDirection:"column", gap:"12px" }}>
+            <div style={{ display:"flex", flexDirection:"row", flexWrap:"wrap", gap:"16px", alignItems:"stretch" }}>
+              <div style={{ flex:"1 1 60%", minWidth:"280px", display:"flex", flexDirection:"column", gap:"12px" }}>
                 <div className={`exercise-video-container${liveFeedback ? (liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect") : ""}`} style={{ height:"60vh", width:"100%", maxWidth:"none", borderRadius:"12px", overflow:"hidden", position:"relative" }}>
                   <video ref={videoRef} className="exercise-video" autoPlay playsInline muted webkit-playsinline="true" style={{width:"100%", height:"100%", objectFit:"cover", display:"block"}} />
                   <canvas ref={canvasRef} className="exercise-pose-canvas" />
@@ -561,7 +561,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                   </div>
                 )}
               </div>
-              <div style={{ flex:"1 1 30%", minWidth:"200px", display:"flex", flexDirection:"column", gap:"12px" }}>
+              <div style={{ flex:"1 1 240px", minWidth:"240px", display:"flex", flexDirection:"column", gap:"12px" }}>
                 <p style={{ fontWeight:"600", margin:"0 0 4px", fontSize:"15px", color:"#e2e8f0" }}>💡 Tips for Best Results</p>
                 {[
                   { icon:"💪", title:"Warm up first", desc:"Spend 5 minutes warming up before any session to prevent injuries." },
@@ -593,10 +593,9 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
             {!analyzing && !uploadSuccess && uploadVideoUrl && (
               <button type="button" className="btn primary" onClick={handleUploadSubmit}>Analyse Video</button>
             )}
-            {uploadVideoUrl && (
-              <>
-              {analyzing && <p className="exercise-analyzing" style={{margin:"8px 0", textAlign:"center"}}>⏳ Analysing video… {uploadProgress}%</p>}
-              <div style={{ display:"flex", flexDirection:"column", gap:"16px", marginTop:"8px" }}>
+            {analyzing && <p className="exercise-analyzing" style={{margin:"8px 0", textAlign:"center"}}>⏳ Analysing video… {uploadProgress}%</p>}
+            <>
+              <div style={{ display:"flex", flexDirection:"column", gap:"16px", marginTop:"8px", width:"100%" }}>
                 {uploadSuccess && uploadResult && (
                   <div style={{ background:"rgba(6,182,212,0.08)", border:"1px solid rgba(6,182,212,0.2)", borderRadius:"12px", padding:"16px", fontSize:"14px" }}>
                     <p className="exercise-upload-success">✅ Analysis complete!</p>
@@ -620,24 +619,34 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                     )}
                   </div>
                 )}
-                <div style={{ display:"flex", flexDirection:"row", gap:"16px", alignItems:"stretch" }}>
-                  <div style={{ flex:"1 1 65%", borderRadius:"12px", overflow:"hidden", border:"1px solid rgba(255,255,255,0.1)" }}>
-                    <video
-                      id="upload-preview-video"
-                      src={uploadVideoUrl}
-                      muted
-                      style={{ width:"100%", height:"60vh", display:"block", background:"#000", objectFit:"cover" }}
-                    />
-                    {analyzing && (
-                      <div style={{ padding:"10px 16px", background:"rgba(6,182,212,0.08)", display:"flex", alignItems:"center", gap:"12px" }}>
-                        <div style={{ flex:1, height:"6px", background:"rgba(255,255,255,0.1)", borderRadius:"4px", overflow:"hidden" }}>
-                          <div style={{ height:"100%", width:`${uploadProgress}%`, background:"linear-gradient(90deg,#7c3aed,#06b6d4)", borderRadius:"4px", transition:"width 0.3s ease" }} />
+                <div style={{ display:"flex", flexDirection:"row", flexWrap:"wrap", gap:"16px", alignItems:"stretch", width:"100%" }}>
+                  <div style={{ flex:"1 1 60%", minWidth:"280px", borderRadius:"12px", overflow:"hidden", border:"1px solid rgba(255,255,255,0.1)", height:"60vh", background:"rgba(0,0,0,0.3)", display:"flex", flexDirection:"column" }}>
+                    {uploadVideoUrl ? (
+                      <>
+                      <video
+                        id="upload-preview-video"
+                        src={uploadVideoUrl}
+                        muted
+                        style={{ width:"100%", height:"100%", display:"block", background:"#000", objectFit:"cover", flex:1 }}
+                      />
+                      {analyzing && (
+                        <div style={{ padding:"10px 16px", background:"rgba(6,182,212,0.08)", display:"flex", alignItems:"center", gap:"12px" }}>
+                          <div style={{ flex:1, height:"6px", background:"rgba(255,255,255,0.1)", borderRadius:"4px", overflow:"hidden" }}>
+                            <div style={{ height:"100%", width:`${uploadProgress}%`, background:"linear-gradient(90deg,#7c3aed,#06b6d4)", borderRadius:"4px", transition:"width 0.3s ease" }} />
+                          </div>
+                          <span style={{ fontSize:"13px", color:"#67e8f9", whiteSpace:"nowrap" }}>{uploadProgress}%</span>
                         </div>
-                        <span style={{ fontSize:"13px", color:"#67e8f9", whiteSpace:"nowrap" }}>{uploadProgress}%</span>
+                      )}
+                      </>
+                    ) : (
+                      <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.15)" }}>
+                        <div style={{ fontSize:"64px", marginBottom:"16px" }}>🎥</div>
+                        <p style={{ margin:0, fontSize:"15px" }}>Your video will appear here</p>
+                        <p style={{ margin:"6px 0 0", fontSize:"12px", color:"rgba(255,255,255,0.1)" }}>Select a file above to get started</p>
                       </div>
                     )}
                   </div>
-                  <div style={{ flex:"1 1 30%", minWidth:"200px", display:"flex", flexDirection:"column", gap:"12px" }}>
+                  <div style={{ flex:"1 1 240px", minWidth:"240px", display:"flex", flexDirection:"column", gap:"12px" }}>
                     <p style={{ fontWeight:"600", margin:"0 0 4px", fontSize:"15px", color:"#e2e8f0" }}>💡 Tips for Best Results</p>
                     {[
                       { icon:"💪", title:"Warm up first", desc:"Spend 5 minutes warming up before any session to prevent injuries." },
@@ -654,8 +663,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                   </div>
                 </div>
               </div>
-              </>
-            )}
+            </>
             {uploadError && <p style={{ color:"#fca5a5", margin:0 }}>⚠️ {uploadError}</p>}
           </div>
         )}

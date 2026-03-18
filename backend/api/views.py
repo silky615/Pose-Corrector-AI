@@ -3016,6 +3016,7 @@ def profile(request):
             "date": s.ended_at.astimezone(__import__("datetime").timezone(__import__("datetime").timedelta(hours=-8))).strftime("%Y-%m-%d") if s.ended_at else "",
             "reps": s.total_reps or 0,
             "accuracy": float(s.avg_accuracy) if s.avg_accuracy is not None else 0,
+            "mode": s.mode or "live",
         }
         for s in recent
     ]

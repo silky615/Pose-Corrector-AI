@@ -57,9 +57,10 @@ export default function ProfilePage({ onNavigate }) {
   }
 
   const stats = profileData ? [
-    { label: "Total Workouts", value: profileData.totalWorkouts ?? 0, icon: "🏋️", color: "#7c3aed" },
-    { label: "Streak", value: `${profileData.streakDays ?? 0} days`, icon: "🔥", color: "#FF6B6B" },
-    { label: "Avg Score", value: `${profileData.avgScore ?? 0}%`, icon: "⭐", color: "#06b6d4" },
+    { label: "Total Workouts", value: profileData.totalWorkouts ?? 0, icon: "🏆", color: "#6366f1" },
+    { label: "Streak", value: `${profileData.streakDays ?? 0} days`, icon: "🔥", color: "#ef4444" },
+    { label: "Avg Score", value: `${profileData.avgScore ?? 0}%`, icon: "⭐", color: "#eab308" },
+    { label: "This Week", value: profileData.thisWeek ?? 0, icon: "📅", color: "#06b6d4" },
   ] : [];
 
   const recentWorkouts = profileData?.recentWorkouts || [];
@@ -172,17 +173,19 @@ export default function ProfilePage({ onNavigate }) {
               >{editing ? "Save" : "Edit Profile"}</button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
               {stats.map(s => (
                 <div key={s.label} style={{
                   background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.07)",
+                  border: `1px solid ${s.color}80`,
                   borderRadius: 16, padding: "20px",
-                  borderTop: `3px solid ${s.color}`,
+                  display: "flex", alignItems: "center", gap: "16px",
                 }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>{s.icon}</div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.value}</div>
-                  <div style={{ fontSize: 13, opacity: 0.5, marginTop: 4 }}>{s.label}</div>
+                  <span style={{ fontSize: "32px" }}>{s.icon}</span>
+                  <div>
+                    <div style={{ fontSize: "28px", fontWeight: "800", color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)", marginTop: "2px" }}>{s.label}</div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -207,7 +210,7 @@ export default function ProfilePage({ onNavigate }) {
                         <span style={{ fontSize: 22 }}>{EXERCISE_ICONS[w.exercise_type] || "🏋️"}</span>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: 14, textTransform: "capitalize" }}>{(w.exercise_type || "").replace(/_/g, " ")}</div>
-                          <div style={{ fontSize: 12, opacity: 0.5 }}>{w.date} · {(w.exercise_type === "plank" || w.exercise_type === "tree_pose") ? `${w.reps}s` : `${w.reps} reps`}</div>
+                          <div style={{ fontSize: 12, opacity: 0.5 }}>{w.date ? w.date.split("-").slice(1).concat(w.date.split("-")[0]).join("/") : ""} · {w.mode === "upload" ? "Upload" : "Live"} · {(w.exercise_type === "plank" || w.exercise_type === "tree_pose") ? `${w.reps}s` : `${w.reps} reps`}</div>
                         </div>
                         <div style={{
                           background: w.accuracy >= 90 ? "rgba(6,182,212,0.15)" : "rgba(124,58,237,0.15)",
@@ -240,20 +243,7 @@ export default function ProfilePage({ onNavigate }) {
                     </div>
                   ))}
                 </div>
-                <div style={{
-                  marginTop: 24, padding: "16px", borderRadius: 12,
-                  background: profileData?.streakDays > 0 ? "rgba(255,107,107,0.08)" : "rgba(255,255,255,0.04)",
-                  border: profileData?.streakDays > 0 ? "1px solid rgba(255,107,107,0.15)" : "1px solid rgba(255,255,255,0.07)",
-                  textAlign: "center"
-                }}>
-                  <div style={{ fontSize: 26 }}>{profileData?.streakDays > 0 ? "🔥" : "💤"}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: profileData?.streakDays > 0 ? "#FF6B6B" : "rgba(255,255,255,0.4)" }}>
-                    {profileData?.streakDays > 0 ? `${profileData.streakDays} Day Streak!` : "No streak yet"}
-                  </div>
-                  <div style={{ fontSize: 12, opacity: 0.5, marginTop: 4 }}>
-                    {profileData?.streakDays > 0 ? "Keep it going!" : "Start your first workout!"}
-                  </div>
-                </div>
+
               </div>
             </div>
           </>

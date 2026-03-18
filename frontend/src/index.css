@@ -300,7 +300,7 @@ html, body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; }
 .exercise-page-main {
   flex: 1;
   width: 100%;
-  max-width: 900px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 24px 20px 48px;
 }
@@ -851,4 +851,12 @@ html, body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; }
 @media (max-width: 400px) {
   .landing-exercise-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .landing-tips-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Live mode mobile */
+@media (max-width: 768px) {
+  .exercise-live-wrap { width: 100%; overflow-x: hidden; }
+  .exercise-live-wrap > div { flex-direction: column !important; }
+  .exercise-live-wrap .exercise-feedback { max-width: 100% !important; width: 100% !important; box-sizing: border-box; }
+  .exercise-video-container { max-width: 100% !important; width: 100% !important; }
 }
