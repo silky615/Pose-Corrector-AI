@@ -7,6 +7,16 @@ const EXERCISE_ICONS = {
   push_up: "🤸", lunge: "🚶", tree_pose: "🧘",
 };
 
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isMobile;
+}
 export default function ProfilePage({ onNavigate }) {
   const [editing, setEditing] = useState(false);
   const [age, setAge] = useState("");
@@ -16,6 +26,7 @@ export default function ProfilePage({ onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saveMsg, setSaveMsg] = useState("");
+  const isMobile = useIsMobile();
 
   const userId = localStorage.getItem("pc_demo_user_id");
   const userName = localStorage.getItem("pc_demo_username") || localStorage.getItem("pc_demo_email") || "User";
@@ -75,7 +86,7 @@ export default function ProfilePage({ onNavigate }) {
     }}>
       <header style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "14px 32px",
+        padding: isMobile ? "12px 16px" : "14px 32px",
         background: "rgba(15,23,42,0.85)",
         backdropFilter: "blur(12px)",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
@@ -90,11 +101,11 @@ export default function ProfilePage({ onNavigate }) {
           }}>PC</div>
           <span style={{ fontWeight: "600", fontSize: "16px", color: "#e6f7f9" }}>Pose Corrector AI</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 16 }}>
           <button type="button"
             onClick={() => onNavigate ? onNavigate("dashboard") : (window.location.hash = "dashboard")}
-            style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", fontSize: "14px", cursor: "pointer", padding: "7px 14px" }}
-          >← Back to exercises</button>
+            style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", fontSize: "14px", cursor: "pointer", padding: isMobile ? "6px 8px" : "7px 14px" }}
+          >← Back</button>
           <span style={{ fontSize: "14px", color: "rgba(255,255,255,0.5)" }}>👤 {displayName}</span>
           <button type="button"
             onClick={() => {
@@ -103,12 +114,12 @@ export default function ProfilePage({ onNavigate }) {
               localStorage.removeItem("pc_demo_user_id");
               onNavigate ? onNavigate("signin") : (window.location.hash = "signin");
             }}
-            style={{ background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "rgba(255,255,255,0.6)", fontSize: "14px", padding: "7px 14px", cursor: "pointer" }}
+            style={{ background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "rgba(255,255,255,0.6)", fontSize: isMobile ? 12 : 14, padding: isMobile ? "5px 10px" : "7px 14px", cursor: "pointer" }}
           >Sign out</button>
         </div>
       </header>
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 40px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "20px 16px" : "32px 40px" }}>
 
         {loading && <div style={{ textAlign: "center", opacity: 0.6, padding: 60 }}>Loading profile...</div>}
         {error && <div style={{ textAlign: "center", color: "#FF6B6B", padding: 60 }}>{error}</div>}
@@ -116,64 +127,94 @@ export default function ProfilePage({ onNavigate }) {
         {!loading && !error && (
           <>
             <div style={{
-              display: "flex", alignItems: "center", gap: 24, marginBottom: 28,
               background: "rgba(255,255,255,0.04)",
-              borderRadius: 20, padding: "24px 28px",
+              borderRadius: 20, padding: isMobile ? "20px 16px" : "28px",
               border: "1px solid rgba(255,255,255,0.07)",
+              marginBottom: 20,
             }}>
+              {/* Avatar + name row */}
               <div style={{
-                width: 72, height: 72, borderRadius: "50%",
-                background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 28, fontWeight: 800
-              }}>{displayName.charAt(0).toUpperCase()}</div>
-              <div style={{ flex: 1 }}>
-                <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#e6f7f9" }}>{displayName}</h1>
-                <p style={{ margin: "4px 0 10px", opacity: 0.5, fontSize: 14 }}>
-                  {localStorage.getItem("pc_demo_email") || ""} · Member since {profileData?.memberSince ? new Date(profileData.memberSince).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "2026"}
-                </p>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  {[
-                    { label: "Age", value: age, setter: setAge, unit: "yrs" },
-                    { label: "Height (inches)", value: height, setter: setHeight, unit: "in" },
-                    { label: "Weight (lb)", value: weight, setter: setWeight, unit: "lb" },
-                  ].map((field) => (
-                    <div key={field.label} style={{
-                      background: "rgba(255,255,255,0.06)", borderRadius: 8,
-                      padding: "4px 12px", fontSize: 13,
-                      display: "flex", alignItems: "center", gap: 6,
-                      border: "1px solid rgba(255,255,255,0.07)",
-                    }}>
-                      <span style={{ opacity: 0.5 }}>{field.label}:</span>
-                      {editing ? (
+                display: "flex",
+                flexDirection: isMobile ? "column" : "row",
+                alignItems: isMobile ? "center" : "flex-start",
+                textAlign: isMobile ? "center" : "left",
+                gap: 16, marginBottom: 20,
+              }}>
+                <div style={{
+                  width: 72, height: 72, borderRadius: "50%", flexShrink: 0,
+                  background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 28, fontWeight: 800, color: "#fff",
+                  boxShadow: "0 0 24px rgba(124,58,237,0.4)",
+                }}>{displayName.charAt(0).toUpperCase()}</div>
+                <div style={{ flex: 1 }}>
+                  <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 22, fontWeight: 700, color: "#e6f7f9", lineHeight: 1.2 }}>{displayName}</h1>
+                  <p style={{ margin: "5px 0 2px", opacity: 0.45, fontSize: 13 }}>
+                    {localStorage.getItem("pc_demo_email") || ""}
+                  </p>
+                  <p style={{ margin: 0, opacity: 0.35, fontSize: 12 }}>
+                    Member since {profileData?.memberSince ? new Date(profileData.memberSince).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "Mar 2026"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Age / Height / Weight */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: isMobile ? 10 : 14, marginBottom: 16 }}>
+                {[
+                  { label: "Age",    value: age,    setter: setAge,    unit: "yrs", icon: "🎂" },
+                  { label: "Height", value: height, setter: setHeight, unit: "in",  icon: "📏" },
+                  { label: "Weight", value: weight, setter: setWeight, unit: "lb",  icon: "⚖️" },
+                ].map((field) => (
+                  <div key={field.label} style={{
+                    background: "rgba(255,255,255,0.05)", borderRadius: 12,
+                    padding: isMobile ? "12px 10px" : "14px 16px",
+                    display: "flex", flexDirection: "column", gap: 6,
+                    border: "1px solid rgba(255,255,255,0.08)",
+                  }}>
+                    <span style={{ fontSize: isMobile ? 10 : 11, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      {field.icon} {field.label}
+                    </span>
+                    {editing ? (
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                         <input type="text" value={field.value || ""}
                           onChange={(e) => field.setter(e.target.value)}
                           style={{
                             background: "transparent", border: "none",
                             borderBottom: "1px solid rgba(255,255,255,0.35)",
-                            color: "#e6f7f9", fontSize: 13, padding: "2px 0",
-                            outline: "none", minWidth: 40,
+                            color: "#e6f7f9", fontSize: isMobile ? 17 : 20, fontWeight: 700,
+                            padding: "2px 0", outline: "none", width: isMobile ? "44px" : "60px",
                           }}
                         />
-                      ) : (
-                        <span style={{ fontWeight: 600 }}>{field.value ? `${field.value} ${field.unit}` : "—"}</span>
-                      )}
-                    </div>
-                  ))}
-                  {saveMsg && <span style={{ fontSize: 13, color: "#00C9A7", alignSelf: "center" }}>{saveMsg}</span>}
-                </div>
+                        <span style={{ fontSize: 11, opacity: 0.5 }}>{field.unit}</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                        <span style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: "#e6f7f9" }}>
+                          {field.value || "—"}
+                        </span>
+                        {field.value && <span style={{ fontSize: 11, opacity: 0.5 }}>{field.unit}</span>}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-              <button
-                style={{
-                  background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
-                  border: "none", color: "#fff", borderRadius: 10,
-                  padding: "10px 20px", cursor: "pointer", fontWeight: 600, fontSize: 14,
-                }}
-                onClick={() => editing ? handleSave() : setEditing(true)}
-              >{editing ? "Save" : "Edit Profile"}</button>
+
+              {/* Edit / Save button - below stats */}
+              <div style={{ display: "flex", justifyContent: isMobile ? "stretch" : "flex-end", gap: 8 }}>
+                <button
+                  style={{
+                    background: "linear-gradient(135deg, #7c3aed, #06b6d4)",
+                    border: "none", color: "#fff", borderRadius: 12,
+                    padding: "11px 28px", cursor: "pointer", fontWeight: 600, fontSize: 14,
+                    width: isMobile ? "100%" : "auto",
+                  }}
+                  onClick={() => editing ? handleSave() : setEditing(true)}
+                >{editing ? "Save Changes" : "Edit Profile"}</button>
+              </div>
+              {saveMsg && <p style={{ fontSize: 13, color: "#00C9A7", textAlign: "center", margin: "8px 0 0" }}>{saveMsg}</p>}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 12 : 16, marginBottom: 20 }}>
               {stats.map(s => (
                 <div key={s.label} style={{
                   background: "rgba(255,255,255,0.04)",
@@ -190,7 +231,7 @@ export default function ProfilePage({ onNavigate }) {
               ))}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
               <div style={{
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.07)",

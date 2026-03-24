@@ -860,3 +860,10 @@ html, body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; }
   .exercise-live-wrap .exercise-feedback { max-width: 100% !important; width: 100% !important; box-sizing: border-box; }
   .exercise-video-container { max-width: 100% !important; width: 100% !important; }
 }
+
+/* Profile page mobile */
+@media (max-width: 768px) {
+  .profile-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .profile-main-grid { grid-template-columns: 1fr !important; }
+  .profile-info-badges { flex-direction: column !important; }
+}

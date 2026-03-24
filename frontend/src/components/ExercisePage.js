@@ -259,26 +259,35 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
       );
+      // Use CPU delegate for mobile compatibility
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: "GPU" },
+        baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: isMobile ? "CPU" : "GPU" },
         runningMode: "VIDEO", numPoses: 1,
       });
 
       const videoEl = document.createElement("video");
       videoEl.src = URL.createObjectURL(uploadFile);
       videoEl.muted = true;
+      videoEl.playsInline = true;
+      videoEl.setAttribute("playsinline", "");
+      videoEl.setAttribute("webkit-playsinline", "");
       await new Promise((res) => { videoEl.onloadedmetadata = res; });
       const duration = videoEl.duration;
 
       const accuracies = [];
       let maxReps = 0;
       let goodFrames = 0;
-      const frameInterval = 1 / 10;
-      let currentTime = 0;
+      let lastProcessedTime = -1;
 
       await new Promise((resolve, reject) => {
-        videoEl.onseeked = async () => {
+        videoEl.ontimeupdate = async () => {
           try {
+            const currentTime = videoEl.currentTime;
+            // Process every 250ms to avoid overwhelming backend
+            if (currentTime - lastProcessedTime < 0.25) return;
+            lastProcessedTime = currentTime;
+
             const ts = Math.round(currentTime * 1000);
             const result = poseLandmarker.detectForVideo(videoEl, ts);
             const lms = landmarksFromPoseResult(result);
@@ -291,28 +300,23 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
               }
             }
             setUploadProgress(Math.round((currentTime / duration) * 100));
-            currentTime += frameInterval;
             // Sync preview video
             const prev = document.getElementById("upload-preview-video");
             if (prev) prev.currentTime = currentTime;
-            if (currentTime < duration) {
-              videoEl.currentTime = currentTime;
-            } else {
-              resolve();
-            }
           } catch(e) { reject(e); }
         };
+        videoEl.onended = () => resolve();
         videoEl.onerror = reject;
-        videoEl.currentTime = 0;
         // Sync preview video
         const previewVid = document.getElementById("upload-preview-video");
         if (previewVid) { previewVid.currentTime = 0; previewVid.play().catch(()=>{}); }
+        videoEl.play().catch(reject);
       });
 
       const avgAccuracy = accuracies.length > 0
         ? Math.round(accuracies.reduce((a,b) => a+b, 0) / accuracies.length) : 0;
 
-      const holdSeconds = Math.round(goodFrames * frameInterval);
+      const holdSeconds = Math.round(goodFrames * 0.25);
       const tipsByExercise = {
         "tree-pose": {
           low:  ["Focus on a fixed point ahead to improve balance.", "Keep your standing leg fully straight.", "Press your foot firmly against your inner thigh, not the knee."],
@@ -497,8 +501,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                 <h2 style={{ margin:"0 0 16px", fontSize:"20px", fontWeight:"700", color:"white" }}>✅ Form Checklist</h2>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
                   {exercise.checklist.map((tip, i) => (
-                    <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:"12px", padding:"16px 18px", background:"rgba(34,197,94,0.06)", border:"1px solid rgba(34,197,94,0.15)", borderRadius:"12px" }}>
-                      <span style={{ fontSize:"16px", flexShrink:0, marginTop:"1px" }}>✅</span>
+                    <div key={i} style={{ padding:"16px 18px", background:"rgba(34,197,94,0.06)", border:"1px solid rgba(34,197,94,0.15)", borderRadius:"12px" }}>
                       <span style={{ fontSize:"14px", color:"rgba(255,255,255,0.75)", lineHeight:1.6 }}>{tip}</span>
                     </div>
                   ))}
