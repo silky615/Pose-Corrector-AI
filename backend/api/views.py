@@ -1590,10 +1590,10 @@ def stream_process(request):
 
             if calculate_angle:
                 try:
-                    # Use y and z for angle (vertical drop + depth)
-                    l_knee_ang_raw = float(calculate_angle([l_hip_y,l_hip_z],[l_knee_y,l_knee_z],[l_ankle_y,l_ankle_z]))
-                    r_knee_ang_raw = float(calculate_angle([r_hip_y,r_hip_z],[r_knee_y,r_knee_z],[r_ankle_y,r_ankle_z]))
-                    print(f"[LUNGE YZ] l={l_knee_ang_raw:.1f} r={r_knee_ang_raw:.1f} l_hip_z={l_hip_z:.3f} l_knee_z={l_knee_z:.3f} l_ankle_z={l_ankle_z:.3f}")
+                    # Use XY coordinates for reliable angle calculation
+                    l_knee_ang_raw = float(calculate_angle([l_hip_x,l_hip_y],[l_knee_x,l_knee_y],[l_ankle_x,l_ankle_y]))
+                    r_knee_ang_raw = float(calculate_angle([r_hip_x,r_hip_y],[r_knee_x,r_knee_y],[r_ankle_x,r_ankle_y]))
+                    print(f"[LUNGE XY] l={l_knee_ang_raw:.1f} r={r_knee_ang_raw:.1f}")
                 except Exception:
                     l_knee_ang_raw, r_knee_ang_raw = 180.0, 180.0
             else:
@@ -1623,7 +1623,7 @@ def stream_process(request):
             ls_x = _get(11,"x"); rs_x = _get(12,"x")
             shoulder_spread = abs(ls_x - rs_x)
             print(f"[LUNGE STAND] shoulder_spread={shoulder_spread:.3f}")
-            if shoulder_spread > 0.15:
+            if shoulder_spread > 0.30:
                 return Response({"message": "Lunge: Stand sideways to the camera — your side should face the lens.", "accuracy": 0, "posture_ok": False, "stage": "up", "counter": 0})
             print(f"[LUNGE COORDS] l_hip=({l_hip_x:.3f},{l_hip_y:.3f}) l_knee=({l_knee_x:.3f},{l_knee_y:.3f}) l_ankle=({l_ankle_x:.3f},{l_ankle_y:.3f})")
             print(f"[LUNGE COORDS] r_hip=({r_hip_x:.3f},{r_hip_y:.3f}) r_knee=({r_knee_x:.3f},{r_knee_y:.3f}) r_ankle=({r_ankle_x:.3f},{r_ankle_y:.3f})")
@@ -1640,7 +1640,7 @@ def stream_process(request):
                     "accuracy": 0, "posture_ok": False, "stage": "up", "counter": 0
                 })
 
-            stage = "down" if knee_ang < 115 else "up"
+            stage = "down" if knee_ang < 100 else "up"
 
             # Torso upright check (shoulder should be above hip vertically)
             shoulder_y = float(shoulder[1])
@@ -1659,7 +1659,7 @@ def stream_process(request):
                 })
 
             # Depth check
-            if stage == "up" and knee_ang > 140:
+            if stage == "up" and knee_ang > 120:
                 return Response({
                     "message": "Lunge: Lower your body more — aim for 90 degrees in your front knee.",
                     "accuracy": 55, "posture_ok": False, "stage": stage
@@ -1707,8 +1707,8 @@ def stream_process(request):
 
             if is_correct and stage == "down":
                 return Response({"message": "Lunge: Excellent! Great depth and form.", "accuracy": acc, "posture_ok": True, "stage": stage, "counter": ls.get("counter", 0)})
-            elif is_correct:
-                return Response({"message": "Lunge: Good form! Lower your front knee to 90 degrees.", "accuracy": acc, "posture_ok": True, "stage": stage, "counter": ls.get("counter", 0)})
+            elif stage == "up":
+                return Response({"message": "Lunge: Step forward and lower your body to lunge position.", "accuracy": 40, "posture_ok": False, "stage": stage, "counter": ls.get("counter", 0)})
             else:
                 return Response({"message": "Lunge: Keep your front knee over your toes and step further forward.", "accuracy": max(40, int(err_conf * 60)), "posture_ok": False, "stage": stage, "counter": ls.get("counter", 0)})
 
@@ -2980,6 +2980,7 @@ def reset_password_by_email(request):
 # ─── Profile (stats + recent workouts) ────────────────────────────────────────
 @api_view(["GET", "POST"])
 def profile(request):
+    from django.db.models import Max
     from api.models import User, Session
     from django.utils import timezone
     from django.db.models import Avg
@@ -3022,11 +3023,17 @@ def profile(request):
     ]
     avg_score = sessions.aggregate(avg=Avg("avg_accuracy"))["avg"]
     avg_score = round(float(avg_score), 0) if avg_score is not None else 0
-    # Simple streak: days with at least one session ending that day, going back from today
+    # Streak: convert all session dates to PST before comparing
+    PST_OFFSET = __import__("datetime").timezone(__import__("datetime").timedelta(hours=-8))
+    session_dates = set(
+        s.ended_at.astimezone(PST_OFFSET).date()
+        for s in sessions
+        if s.ended_at
+    )
     streak = 0
     d = today
     while True:
-        if sessions.filter(ended_at__date=d).exists():
+        if d in session_dates:
             streak += 1
             d -= timedelta(days=1)
         else:
@@ -3059,6 +3066,19 @@ def profile(request):
         "totalWorkouts": total_workouts,
         "thisWeek": this_week,
         "streakDays": streak,
+        "personalBest": [
+            {
+                "exercise_type": s["exercise_type"],
+                "best_accuracy": float(s["best_accuracy"]),
+                "best_reps": s["best_reps"],
+            }
+            for s in Session.objects.filter(user=user)
+                .exclude(ended_at__isnull=True)
+                .exclude(avg_accuracy=0)
+                .values("exercise_type")
+                .annotate(best_accuracy=Max("avg_accuracy"), best_reps=Max("total_reps"))
+                .order_by("exercise_type")
+        ],
         "avgScore": int(avg_score),
         "recentWorkouts": recent_workouts,
         "weeklyActivity": weekly_activity,
@@ -3189,5 +3209,35 @@ def verify_otp(request):
         except Exception:
             pass
         return JsonResponse({"success": True, "user_id": user.id, "name": user.first_name, "email": user.email})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+@api_view(["GET"])
+def chart_data(request):
+    user_id = request.query_params.get("user_id")
+    if not user_id:
+        return JsonResponse({"error": "user_id required"}, status=400)
+    try:
+        from datetime import timezone as dt_timezone, timedelta as td
+        from .models import Session
+        PST = dt_timezone(td(hours=-8))
+        sessions = Session.objects.filter(
+            user_id=int(user_id),
+            ended_at__isnull=False,
+            avg_accuracy__gt=0
+        ).order_by("ended_at")
+
+        data = {}
+        for s in sessions:
+            ex = s.exercise_type
+            date_str = s.ended_at.astimezone(PST).strftime("%b %d")
+            if ex not in data:
+                data[ex] = []
+            data[ex].append({
+                "date": date_str,
+                "accuracy": float(s.avg_accuracy)
+            })
+
+        return JsonResponse({"chartData": data})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)

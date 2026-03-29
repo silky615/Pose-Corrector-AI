@@ -31,7 +31,7 @@ export default function SignUp({ onNavigate }) {
     if (!form.age || Number(form.age) <= 0) return "Enter a valid age";
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!re.test(form.email)) return "Enter a valid email";
-    if (!form.height || Number(form.height) <= 0) return "Enter a valid height (inches)";
+    if (!form.height || Number(form.height) <= 0) return "Enter a valid height (feet)";
     if (!form.weight || Number(form.weight) <= 0) return "Enter a valid weight (lbs)";
     if (!form.password || form.password.length < 6) return "Password must be at least 6 characters";
     return "";
@@ -226,14 +226,14 @@ export default function SignUp({ onNavigate }) {
                 onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"} />
             </div>
             <div style={labelStyle}>
-              Height (inches)
+              Height (ft)
               <input type="number" value={form.height} onChange={e => update("height", e.target.value)}
-                placeholder="170" min="1" style={inputStyle}
+                placeholder="5.6" min="1" style={inputStyle}
                 onFocus={e => e.target.style.borderColor = "#7c3aed"}
                 onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"} />
             </div>
             <div style={labelStyle}>
-              Weight (lbs)
+              Weight (lb)
               <input type="number" value={form.weight} onChange={e => update("weight", e.target.value)}
                 placeholder="65" min="1" style={inputStyle}
                 onFocus={e => e.target.style.borderColor = "#7c3aed"}
@@ -247,18 +247,14 @@ export default function SignUp({ onNavigate }) {
                   placeholder="Min 6 characters" style={{ ...inputStyle, paddingRight: "50px" }}
                   onFocus={e => e.target.style.borderColor = "#7c3aed"}
                   onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"} />
-                <button type="button" onClick={() => setShowPassword(v => !v)} style={{
-                  position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)",
-                  background: "none", border: "none", cursor: "pointer", fontSize: "20px" }}>
-                  {showPassword ? "🙈" : "👁️"}
-                </button>
+                
               </div>
             </div>
           </div>
-          <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.3)" }}>🔒 Password must be at least 6 characters</p>
+          <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.3)" }}>Password must be at least 6 characters</p>
           {error && <div style={errorBox}>⚠️ {error}</div>}
           <button type="submit" disabled={isLoading} style={primaryBtn(isLoading)}>
-            {isLoading ? "Sending verification code…" : "Send Verification Code 📧"}
+            {isLoading ? "Sending verification code…" : "Send Verification Code"}
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
             <span style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.07)" }} />

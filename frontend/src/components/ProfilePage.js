@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 const weekDayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -26,6 +27,8 @@ export default function ProfilePage({ onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saveMsg, setSaveMsg] = useState("");
+  const [chartData, setChartData] = useState({});
+  const [selectedEx, setSelectedEx] = useState("");
   const isMobile = useIsMobile();
 
   const userId = localStorage.getItem("pc_demo_user_id");
@@ -34,6 +37,10 @@ export default function ProfilePage({ onNavigate }) {
 
   useEffect(() => {
     if (!userId) { setLoading(false); setError("Not logged in"); return; }
+fetch(`/api/chart-data?user_id=${userId}`)
+      .then(r => r.json())
+      .then(data => { if (data.chartData) setChartData(data.chartData); })
+      .catch(() => {});
     fetch(`/api/profile?user_id=${userId}`)
       .then(r => r.json())
       .then(data => {
@@ -159,10 +166,10 @@ export default function ProfilePage({ onNavigate }) {
               </div>
 
               {/* Age / Height / Weight */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: isMobile ? 10 : 14, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 14, marginBottom: 16 }}>
                 {[
                   { label: "Age",    value: age,    setter: setAge,    unit: "yrs", icon: "🎂" },
-                  { label: "Height", value: height, setter: setHeight, unit: "in",  icon: "📏" },
+                  { label: "Height", value: height, setter: setHeight, unit: "ft",  icon: "📏" },
                   { label: "Weight", value: weight, setter: setWeight, unit: "lb",  icon: "⚖️" },
                 ].map((field) => (
                   <div key={field.label} style={{
@@ -172,7 +179,7 @@ export default function ProfilePage({ onNavigate }) {
                     border: "1px solid rgba(255,255,255,0.08)",
                   }}>
                     <span style={{ fontSize: isMobile ? 10 : 11, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      {field.icon} {field.label}
+                      {field.label}
                     </span>
                     {editing ? (
                       <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
@@ -197,6 +204,31 @@ export default function ProfilePage({ onNavigate }) {
                     )}
                   </div>
                 ))}
+
+                {/* BMI as 4th card inside the grid */}
+                {height && weight && (() => {
+                  const heightIn = parseFloat(height) * 12;
+                  const weightLb = parseFloat(weight);
+                  const bmiRaw = (weightLb / (heightIn * heightIn)) * 703;
+                  const bmi = bmiRaw > 0 ? bmiRaw.toFixed(1) : null;
+                  const bmiCategory = !bmi ? "" : bmiRaw < 18.5 ? "Underweight" : bmiRaw < 25 ? "Normal" : bmiRaw < 30 ? "Overweight" : "Obese";
+                  const bmiColor = !bmi ? "#e6f7f9" : bmiRaw < 18.5 ? "#06b6d4" : bmiRaw < 25 ? "#22c55e" : bmiRaw < 30 ? "#eab308" : "#ef4444";
+                  return bmi ? (
+                    <div style={{
+                      background: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 12,
+                      padding: isMobile ? "12px 10px" : "14px 16px",
+                      display: "flex", flexDirection: "column", gap: 6,
+                    }}>
+                      <span style={{ fontSize: isMobile ? 10 : 11, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.06em" }}>BMI</span>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                        <span style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: "#e6f7f9" }}>{bmi}</span>
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: bmiColor }}>{bmiCategory}</span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
 
               {/* Edit / Save button - below stats */}
@@ -230,6 +262,7 @@ export default function ProfilePage({ onNavigate }) {
                 </div>
               ))}
             </div>
+
 
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
               <div style={{
@@ -285,6 +318,34 @@ export default function ProfilePage({ onNavigate }) {
                   ))}
                 </div>
 
+              {/* Accuracy Chart */}
+              {Object.keys(chartData).length > 0 && (() => {
+                const COLORS = { bicep_curl: "#7c3aed", squat: "#06b6d4", lunge: "#22c55e", push_up: "#f59e0b", plank: "#ef4444", tree_pose: "#ec4899" };
+                const LABELS = { bicep_curl: "Bicep Curl", squat: "Squat", lunge: "Lunge", push_up: "Push Up", plank: "Plank", tree_pose: "Tree Pose" };
+                const exercises = Object.keys(chartData);
+                const selEx = selectedEx && chartData[selectedEx] ? selectedEx : exercises[0];
+                const points = chartData[selEx] || [];
+                const color = COLORS[selEx] || "#7c3aed";
+                return (
+                  <div style={{ marginTop: 48, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 28 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+                      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#e6f7f9" }}>Accuracy Over Time</h3>
+                      <select value={selEx} onChange={e => setSelectedEx(e.target.value)} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, color: "#e6f7f9", padding: "5px 10px", fontSize: 12, cursor: "pointer", outline: "none" }}>
+                        {exercises.map(ex => <option key={ex} value={ex} style={{ background: "#0f172a" }}>{LABELS[ex] || ex}</option>)}
+                      </select>
+                    </div>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <LineChart data={points} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} />
+                        <YAxis domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} unit="%" />
+                        <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 11 }} labelStyle={{ color: "#e6f7f9" }} formatter={(val) => [val + "%", "Accuracy"]} />
+                        <Line type="monotone" dataKey="accuracy" stroke={color} strokeWidth={2.5} dot={{ fill: color, r: 3 }} activeDot={{ r: 5 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })()}
               </div>
             </div>
           </>

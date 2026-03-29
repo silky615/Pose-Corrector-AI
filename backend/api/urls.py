@@ -10,6 +10,7 @@ urlpatterns = [
     path("auth/reset-confirm", views.reset_password_confirm, name="reset_password_confirm"),
     path("auth/reset-by-email", views.reset_password_by_email, name="reset_password_by_email"),
     path("profile",       views.profile,          name="profile"),
+    path("chart-data",    views.chart_data,       name="chart-data"),
     path("session/start",  views.start_session,   name="start_session"),
     path("session/end",    views.end_session,      name="end_session"),
     path("video/stream",   views.stream_process,  name="stream_process"),
