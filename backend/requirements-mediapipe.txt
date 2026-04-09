@@ -1,0 +1,3 @@
+# Optional: install only on platforms where MediaPipe has wheels (e.g. x86_64, arm64).
+# Not available on IBM LinuxONE (s390x). The app works without it using a built-in fallback.
+mediapipe>=0.10.0,<=0.10.21
