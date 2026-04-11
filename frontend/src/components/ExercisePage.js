@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import useTheme from "../useTheme";
-import { EXERCISES, getExerciseById } from "../data/exercises";
+import { getExerciseById } from "../data/exercises";
 import * as api from "../api";
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 
@@ -93,6 +93,13 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   const lastSpokenTimeRef = useRef(0);
   const [isMuted, setIsMuted] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const [showWarmup, setShowWarmup] = useState(false);
+  const [warmupSeconds, setWarmupSeconds] = useState(300);
+  const warmupTimerRef = useRef(null);
+  const pendingLiveStartRef = useRef(false);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
+  const [isRecording, setIsRecording] = useState(false);
   const [sessionSummary, setSessionSummary] = useState(null);
   const [reviewStars, setReviewStars] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
@@ -304,6 +311,8 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   }
 
   function handleBack() {
+    // Auto-save recording if active
+    stopRecording();
     const isTimer = exerciseId === "plank" || exerciseId === "tree-pose";
     const reps = isTimer ? totalPlankSecondsRef.current : (maxCounterRef.current || (liveFeedback ? liveFeedback.counter || 0 : 0));
     const acc = repAccuraciesRef.current.length > 0 ? Math.round(repAccuraciesRef.current.reduce((a,b) => a+b, 0) / repAccuraciesRef.current.length) : (liveFeedback && liveFeedback.accuracy ? Math.round(liveFeedback.accuracy) : 0);
@@ -326,14 +335,13 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     onNavigate("dashboard");
   }
 
-  async function handleSubmitReview() {
-    const userId = localStorage.getItem("pc_demo_user_id");
-    if (!userId || reviewStars === 0) return;
-    await api.submitReview(userId, exerciseId, reviewStars, reviewComment, sessionIdRef.current);
-    setReviewSubmitted(true);
-  }
 
-  function handleDismissSummary() {
+  async function handleDismissSummary() {
+    // Auto-save review if stars selected
+    const userId = localStorage.getItem("pc_demo_user_id");
+    if (userId && reviewStars > 0) {
+      await api.submitReview(userId, exerciseId, reviewStars, reviewComment, sessionIdRef.current).catch(() => {});
+    }
     totalPlankSecondsRef.current = 0; plankSecondsRef.current = 0;
     maxCounterRef.current = 0; repAccuraciesRef.current = [];
     setMode(null); setStream(null); setUploadFile(null);
@@ -344,6 +352,60 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     setReviewComment("");
     setReviewSubmitted(false);
     onNavigate("dashboard");
+  }
+
+  function startLiveCamera() {
+    // Show warm-up popup first
+    setWarmupSeconds(300);
+    setShowWarmup(true);
+    pendingLiveStartRef.current = true;
+    warmupTimerRef.current = setInterval(() => {
+      setWarmupSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(warmupTimerRef.current);
+          warmupTimerRef.current = null;
+          setShowWarmup(false);
+          startLiveCamera();
+          return 300;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  function startRecording() {
+    if (!stream) return;
+    recordedChunksRef.current = [];
+    const options = { mimeType: "video/webm;codecs=vp8" };
+    let recorder;
+    try { recorder = new MediaRecorder(stream, options); }
+    catch(e) { recorder = new MediaRecorder(stream); }
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
+    };
+    recorder.onstop = () => {
+      const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${exerciseId}_session_${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      recordedChunksRef.current = [];
+    };
+    recorder.start(100);
+    mediaRecorderRef.current = recorder;
+    setIsRecording(true);
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
+    setIsRecording(false);
   }
 
   function handleLiveStart() {
@@ -357,7 +419,21 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
         .then(data => { sessionIdRef.current = data.session_id; })
         .catch(() => {});
     }
-    setMode("live"); setUploadError(""); setLiveError(""); setLiveFeedback(null); setAnalyzing(true);
+    // Show warm-up popup first
+    setWarmupSeconds(300);
+    setShowWarmup(true);
+    warmupTimerRef.current = setInterval(() => {
+      setWarmupSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(warmupTimerRef.current);
+          warmupTimerRef.current = null;
+          setShowWarmup(false);
+          setMode("live"); setUploadError(""); setLiveError(""); setLiveFeedback(null); setAnalyzing(true);
+          return 300;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   }
 
   function handleResetCounter() {
@@ -402,6 +478,9 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
       let maxReps = 0;
       let goodFrames = 0;
       let lastProcessedTime = -1;
+
+      // Reset backend counter before each upload analysis
+      await api.streamAnalysis(exerciseId, [], true).catch(() => {});
 
       await new Promise((resolve, reject) => {
         videoEl.ontimeupdate = async () => {
@@ -512,7 +591,6 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     );
   }
 
-  const welcomeName = displayName ? displayName.charAt(0).toUpperCase() + displayName.slice(1) : "Guest";
   const youtubeUrl = exercise.youtubeUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(`${exercise.name} exercise tutorial`)}`;
   const diff = difficultyStyle[exercise.difficulty] || difficultyStyle["Beginner"];
 
@@ -551,9 +629,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                 rows={3}
                 style={{ width:"100%", borderRadius:10, border: theme === "light" ? "1px solid rgba(30,64,175,0.3)" : "1px solid rgba(255,255,255,0.15)", background: theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.05)", color: theme === "light" ? "#0f172a" : "white", padding:"10px 14px", fontSize:14, resize:"none", boxSizing:"border-box", outline:"none", marginBottom:10 }}
               />
-              <button onClick={handleSubmitReview} disabled={reviewStars === 0} style={{ width:"100%", padding:"12px", borderRadius:10, border:"none", background: reviewStars === 0 ? "#94a3b8" : "linear-gradient(135deg,#f59e0b,#ef4444)", color:"white", fontSize:14, fontWeight:700, cursor: reviewStars === 0 ? "not-allowed" : "pointer", marginBottom:8 }}>
-                Submit Review
-              </button>
+
             </div>
           ) : (
             <div style={{ marginBottom:24, padding:"14px", borderRadius:12, background:"rgba(6,182,212,0.1)", border:"1px solid rgba(6,182,212,0.3)", color:"#06b6d4", fontWeight:600, fontSize:14 }}>
@@ -576,6 +652,60 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
       color: "#e6f7f9", display: "flex", flexDirection: "column",
     }}>
 
+      {/* WARMUP MODAL */}
+      {showWarmup && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)",
+          zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "20px", boxSizing: "border-box",
+        }}>
+          <div style={{
+            background: theme === "light" ? "white" : "#1e293b",
+            borderRadius: "24px", padding: "28px 32px", maxWidth: "520px", width: "100%",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.4)",
+            border: theme === "light" ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.1)",
+          }}>
+            <h2 style={{ margin: "0 0 6px", fontSize: "22px", fontWeight: "800", color: theme === "light" ? "#0f172a" : "white", textAlign: "center" }}>
+              Warm Up First!
+            </h2>
+            <p style={{ margin: "0 0 20px", fontSize: "14px", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.6)", lineHeight: 1.6, textAlign: "center" }}>
+              5 minutes of warm-up prevents injuries and improves performance.
+            </p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "24px", marginBottom: "24px" }}>
+              <img src="/warmup.png" alt="warmup" style={{ width: "180px", height: "180px", objectFit: "contain" }} />
+              <div style={{ position: "relative", width: "140px", height: "140px", flexShrink: 0 }}>
+                <svg width="140" height="140" style={{ transform: "rotate(-90deg)" }}>
+                  <circle cx="70" cy="70" r="60" fill="none" stroke={theme === "light" ? "#e2e8f0" : "rgba(255,255,255,0.1)"} strokeWidth="8" />
+                  <circle cx="70" cy="70" r="60" fill="none" stroke="#7c3aed" strokeWidth="8"
+                    strokeDasharray={String(2 * Math.PI * 60)}
+                    strokeDashoffset={String(2 * Math.PI * 60 * (warmupSeconds / 300))}
+                    strokeLinecap="round"
+                    style={{ transition: "stroke-dashoffset 1s linear" }}
+                  />
+                </svg>
+                <div style={{
+                  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+                  fontSize: "26px", fontWeight: "700", color: theme === "light" ? "#0f172a" : "white", textAlign: "center",
+                }}>
+                  {Math.floor(warmupSeconds / 60)}:{(warmupSeconds % 60).toString().padStart(2,"0")}
+                  <div style={{ fontSize: "11px", fontWeight: "500", color: theme === "light" ? "#64748b" : "rgba(255,255,255,0.5)", marginTop: "2px" }}>remaining</div>
+                </div>
+              </div>
+            </div>
+            <button onClick={() => {
+              if (warmupTimerRef.current) { clearInterval(warmupTimerRef.current); warmupTimerRef.current = null; }
+              setShowWarmup(false); setWarmupSeconds(300);
+              setMode("live"); setUploadError(""); setLiveError(""); setLiveFeedback(null); setAnalyzing(true);
+            }} style={{
+              width: "100%", padding: "14px", borderRadius: "12px", border: "none", cursor: "pointer",
+              background: "linear-gradient(135deg, #7c3aed, #06b6d4)", color: "white",
+              fontSize: "16px", fontWeight: "700",
+            }}>Skip it</button>
+          </div>
+        </div>
+      )}
+
       {/* TOPBAR */}
       <header style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 32px", background: theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(15,23,42,0.85)", backdropFilter:"blur(12px)", borderBottom: theme === "light" ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
         <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
@@ -583,7 +713,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
           <span style={{ fontWeight:"600", fontSize:"16px", color: theme === "light" ? "#0f172a" : "#e6f7f9" }}>Pose Corrector AI</span>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-          <span style={{ fontSize:"14px", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.5)" }}>👤 {welcomeName}</span>
+          
           <button type="button" onClick={toggleTheme} className="su-theme-btn" style={{ fontSize:"13px", padding:"7px 14px" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
           <button type="button" onClick={handleSignOut} className="su-theme-btn" style={{ fontSize:"13px", padding:"7px 14px" }}>Sign out</button>
         </div>
@@ -592,7 +722,14 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
       <main style={{ flex:1, maxWidth:"1400px", width:"100%", margin:"0 auto", padding:"32px 48px 64px", boxSizing:"border-box" }}>
 
         {/* BACK */}
-        <button type="button" onClick={handleBack} style={{ background:"none", border:"none", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.4)", fontSize:"15px", cursor:"pointer", marginBottom:"24px", padding:0 }}>
+        <button type="button" onClick={() => {
+          if (uploadSuccess && uploadResult) {
+            const isTimer = exerciseId === "plank" || exerciseId === "tree-pose";
+            setSessionSummary({ reps: uploadResult.total_reps, acc: uploadResult.avg_accuracy, isTimer, exerciseName: exercise ? exercise.name : exerciseId });
+          } else {
+            handleBack();
+          }
+        }} style={{ background:"none", border:"none", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.4)", fontSize:"15px", cursor:"pointer", marginBottom:"24px", padding:0 }}>
           ← Back to exercises
         </button>
 
@@ -657,7 +794,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                     <p style={{ margin:"0 0 10px", fontSize:"13px", fontWeight:"600", color: theme === "light" ? "#64748b" : "rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"1px" }}>Muscles Targeted</p>
                     <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
                       {exercise.muscles.map((m, i) => (
-                        <span key={i} style={{ padding:"5px 14px", borderRadius:"20px", fontSize:"13px", background:"rgba(34,197,94,0.12)", border:"1px solid rgba(34,197,94,0.35)", color:"#4ade80" }}>{m}</span>
+                        <span key={i} style={{ padding:"5px 14px", borderRadius:"20px", fontSize:"13px", background:"rgba(34,197,94,0.15)", border:"1px solid rgba(34,197,94,0.6)", color:"#16a34a" }}>{m}</span>
                       ))}
                     </div>
                   </div>
@@ -665,7 +802,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
 
                 {/* YouTube */}
                 <a href={youtubeUrl} target="_blank" rel="noreferrer"
-                  style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"12px 20px", background:"rgba(255,0,0,0.12)", border:"1px solid rgba(255,0,0,0.3)", borderRadius:"10px", color:"#fca5a5", fontSize:"15px", fontWeight:"600", textDecoration:"none", width:"fit-content" }}>
+                  style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"12px 20px", background:"rgba(220,38,38,0.12)", border:"1px solid rgba(220,38,38,0.6)", borderRadius:"10px", color:"#dc2626", fontSize:"15px", fontWeight:"600", textDecoration:"none", width:"fit-content" }}>
                   ▶ Watch YouTube Demo
                 </a>
               </div>
@@ -720,9 +857,14 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                   <div className={`exercise-feedback${liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect"}`} style={{ width:"100%", maxWidth:"none" }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
                       <p className="exercise-feedback-message" style={{margin:0}}>{liveFeedback.message || (liveFeedback.posture_ok ? "✅ Good form!" : "⚠️ Adjust your form")}</p>
-                      <button type="button" onClick={() => { isMutedRef.current = !isMutedRef.current; setIsMuted(isMutedRef.current); window.speechSynthesis.cancel(); }} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:"8px", color:"white", padding:"4px 10px", fontSize:"13px", cursor:"pointer" }}>
-                        {isMuted ? "🔇 Unmute" : "🔊 Mute"}
-                      </button>
+                      <div style={{ display:"flex", gap:"8px" }}>
+                        <button type="button" onClick={() => { isMutedRef.current = !isMutedRef.current; setIsMuted(isMutedRef.current); window.speechSynthesis.cancel(); }} style={{ display:"flex", alignItems:"center", gap:"6px", background:"linear-gradient(135deg,#7c3aed,#06b6d4)", border:"none", borderRadius:"8px", color:"white", padding:"6px 14px", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>
+                          {isMuted ? "🔇 Unmute" : "🔊 Mute"}
+                        </button>
+                        <button type="button" onClick={() => isRecording ? stopRecording() : startRecording()} style={{ display:"flex", alignItems:"center", gap:"6px", background: isRecording ? "linear-gradient(135deg,#ef4444,#dc2626)" : "linear-gradient(135deg,#7c3aed,#06b6d4)", border:"none", borderRadius:"8px", color:"white", padding:"6px 14px", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>
+                          {isRecording ? <><span style={{ width:"8px", height:"8px", borderRadius:"50%", background:"white", display:"inline-block" }}></span> Stop & Save</> : <>🔴 Record</>}
+                        </button>
+                      </div>
                     </div>
                     {liveFeedback.accuracy != null && <p className="exercise-feedback-accuracy">Accuracy: {Math.round(liveFeedback.accuracy)}%</p>}
                     {(exerciseId === "plank" || exerciseId === "tree-pose") && (
@@ -764,20 +906,20 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
           <div className="exercise-upload-wrap">
 
             <h2 style={{ margin:"0 0 16px", fontSize:"22px", fontWeight:"700", color: theme === "light" ? "#0f172a" : "white" }}>{exercise.name} — Upload Video</h2>
-            <label className="exercise-upload-label">
-              Select video file:
-              <input type="file" accept="video/*" onChange={handleUploadChange} className="exercise-upload-input" />
-            </label>
-
+            <label className="exercise-upload-label" style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+              <span style={{ fontSize:"14px", fontWeight:"600", color: theme === "light" ? "#0f172a" : "white" }}>Select video file:</span>
+              <span style={{ padding:"8px 20px", borderRadius:"10px", background:"linear-gradient(135deg,#7c3aed,#06b6d4)", color:"white", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Choose File</span>
+              <input type="file" accept="video/*" onChange={handleUploadChange} className="exercise-upload-input" style={{ display:"none" }} />
             {!analyzing && !uploadSuccess && uploadVideoUrl && (
-              <button type="button" className="btn primary" onClick={handleUploadSubmit}>Analyse Video</button>
+              <button type="button" className="btn primary" onClick={handleUploadSubmit} style={{ marginLeft:"12px" }}>Analyse Video</button>
             )}
-            {analyzing && <p className="exercise-analyzing" style={{margin:"8px 0", textAlign:"center"}}>⏳ Analysing video… {uploadProgress}%</p>}
+            {analyzing && <span style={{marginLeft:"16px", fontSize:"14px", fontWeight:"600", color:"#06b6d4"}}>Analysing... {uploadProgress}%</span>}
+            </label>
             <>
               <div style={{ display:"flex", flexDirection:"column", gap:"16px", marginTop:"8px", width:"100%" }}>
                 {uploadSuccess && uploadResult && (
-                  <div style={{ background:"rgba(6,182,212,0.08)", border:"1px solid rgba(6,182,212,0.2)", borderRadius:"12px", padding:"16px", fontSize:"14px" }}>
-                    <p className="exercise-upload-success">✅ Analysis complete!</p>
+                  <div style={{ background: theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.05)", border: theme === "light" ? "1px solid rgba(30,64,175,0.2)" : "1px solid rgba(255,255,255,0.1)", borderRadius:"12px", padding:"20px", fontSize:"14px", boxShadow: theme === "light" ? "0 2px 12px rgba(0,0,0,0.06)" : "none" }}>
+                    <p className="exercise-upload-success" style={{ fontWeight:"700", fontSize:"16px", color: theme === "light" ? "#0f172a" : "white", marginBottom:"8px" }}>Analysis Complete</p>
                     {uploadResult.total_reps != null && (
                       exerciseId === "plank" || exerciseId === "tree-pose"
                         ? <p className="muted small">Hold time: {uploadResult.total_reps} seconds</p>
@@ -787,7 +929,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                     {uploadResult.feedback && <p style={{ margin:"6px 0 0", fontWeight:"600", color: uploadResult.avg_accuracy >= 90 ? "#4ade80" : uploadResult.avg_accuracy >= 75 ? "#06b6d4" : uploadResult.avg_accuracy >= 60 ? "#fbbf24" : "#fca5a5", fontSize:"13px" }}>{uploadResult.feedback}</p>}
                     {uploadResult.suggestions && uploadResult.suggestions.length > 0 && (
                       <div style={{ marginTop:"12px", borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:"12px" }}>
-                        <p style={{ margin:"0 0 8px", fontSize:"13px", fontWeight:"600", color:"#e2e8f0" }}>💡 Tips to improve your score:</p>
+                        <p style={{ margin:"0 0 8px", fontSize:"13px", fontWeight:"600", color: theme === "light" ? "#0f172a" : "#e2e8f0" }}>Tips to improve your score:</p>
                         {uploadResult.suggestions.map((tip, i) => (
                           <div key={i} style={{ display:"flex", gap:"8px", alignItems:"flex-start", marginBottom:"6px" }}>
                             <span style={{ color:"#06b6d4", fontWeight:"700", flexShrink:0 }}>→</span>
@@ -798,7 +940,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                     )}
                   </div>
                 )}
-                <div style={{ display:"flex", flexDirection:"row", flexWrap:"wrap", gap:"16px", alignItems:"stretch", width:"100%" }}>
+                <div style={{ display:"flex", flexDirection:"row", flexWrap:"wrap", gap:"16px", alignItems:"flex-end", width:"100%" }}>
                   <div style={{ flex:"1 1 60%", minWidth:"280px", borderRadius:"12px", overflow:"hidden", border:"1px solid rgba(255,255,255,0.1)", height:"60vh", background:"rgba(0,0,0,0.3)", display:"flex", flexDirection:"column" }}>
                     {uploadVideoUrl ? (
                       <>

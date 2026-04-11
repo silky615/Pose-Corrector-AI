@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import useTheme from "../useTheme";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 const weekDayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -12,7 +12,6 @@ const EXERCISE_ICONS = {
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
-  const [weeklyDuration, setWeeklyDuration] = useState([]);
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 640);
     window.addEventListener("resize", handler);
@@ -31,10 +30,10 @@ export default function ProfilePage({ onNavigate }) {
   const [error, setError] = useState(null);
   const [saveMsg, setSaveMsg] = useState("");
   const [chartData, setChartData] = useState({});
+  const [weeklyDuration, setWeeklyDuration] = useState([]);
   const [selectedEx, setSelectedEx] = useState("");
   const isMobile = useIsMobile();
   const { theme, toggleTheme } = useTheme();
-  const [weeklyDuration, setWeeklyDuration] = useState([]);
 
   const userId = localStorage.getItem("pc_demo_user_id");
   const userName = localStorage.getItem("pc_demo_username") || localStorage.getItem("pc_demo_email") || "User";
@@ -87,7 +86,7 @@ fetch(`/api/chart-data?user_id=${userId}`)
     { label: "Total Workouts", value: profileData.totalWorkouts ?? 0, icon: "🏆", color: "#6366f1" },
     { label: "Streak", value: `${profileData.streakDays ?? 0} days`, icon: "🔥", color: "#ef4444" },
     { label: "Avg Score", value: `${profileData.avgScore ?? 0}%`, icon: "⭐", color: "#eab308" },
-    { label: "This Week", value: profileData.thisWeek ?? 0, icon: "📅", color: "#06b6d4" },
+    { label: "This Week", value: profileData.thisWeek ?? 0, icon: "CAL", color: "#06b6d4" },
   ] : [];
 
   const recentWorkouts = profileData?.recentWorkouts || [];
@@ -122,7 +121,7 @@ fetch(`/api/chart-data?user_id=${userId}`)
             onClick={() => onNavigate ? onNavigate("dashboard") : (window.location.hash = "dashboard")}
             style={{ background: "none", border: "none", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.6)", fontSize: "14px", cursor: "pointer", padding: isMobile ? "6px 8px" : "7px 14px" }}
           >← Back</button>
-          <span style={{ fontSize: "14px", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.5)" }}>👤 {displayName}</span>
+          
           <button type="button" onClick={toggleTheme} className="su-theme-btn" style={{ fontSize: isMobile ? "11px" : "13px", padding: isMobile ? "5px 10px" : "7px 14px" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
           <button type="button"
             onClick={() => {
@@ -265,7 +264,7 @@ fetch(`/api/chart-data?user_id=${userId}`)
                   borderRadius: 16, padding: "20px",
                   display: "flex", alignItems: "center", gap: "16px",
                 }}>
-                  <span style={{ fontSize: "32px" }}>{s.icon}</span>
+                  {s.icon === "CAL" ? <img src="/calendar.png" alt="calendar" style={{ width:"32px", height:"32px", objectFit:"contain" }} /> : <span style={{ fontSize: "32px" }}>{s.icon}</span>}
                   <div>
                     <div style={{ fontSize: "28px", fontWeight: "800", color: s.color }}>{s.value}</div>
                     <div style={{ fontSize: "13px", color: theme === "light" ? "#64748b" : "rgba(255,255,255,0.4)", marginTop: "2px" }}>{s.label}</div>

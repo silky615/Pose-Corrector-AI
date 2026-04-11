@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import useTheme from "../useTheme";
 import { EXERCISES } from "../data/exercises";
-import * as api from "../api";
 
 const EXERCISE_COLORS = {
   "tree-pose":  { color: "rgba(124,58,237,0.25)",  border: "rgba(124,58,237,0.4)",  shadow: "rgba(124,58,237,0.2)"  },
@@ -12,12 +11,6 @@ const EXERCISE_COLORS = {
   "lunges":     { color: "rgba(168,85,247,0.2)",   border: "rgba(168,85,247,0.4)",  shadow: "rgba(168,85,247,0.2)"  },
 };
 
-const tips = [
-  { icon: "💡", title: "Warm up first",     desc: "Spend 5 minutes warming up before any session to prevent injuries." },
-  { icon: "📸", title: "Good lighting",     desc: "Make sure your full body is visible and well-lit for best AI tracking." },
-  { icon: "👟", title: "Wear fitted clothes", desc: "Fitted clothing helps the AI detect your joints more accurately." },
-  { icon: "📏", title: "Stand back",        desc: "Keep 5–8 feet of distance from the camera for full body detection." },
-];
 
 function ReviewsSection({ theme }) {
   const [reviews, setReviews] = React.useState([]);
@@ -137,7 +130,7 @@ export default function ExerciseLanding({ onNavigate }) {
             onClick={() => onNavigate("profile")}
             style={{ background: "none", border: "none", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.6)", fontSize: "14px", cursor: "pointer", padding: "7px 14px" }}
           >Profile</button>
-          <span style={{ fontSize: "14px", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.5)" }}>👤 {welcomeName}</span>
+          
 <button onClick={toggleTheme} className="su-theme-btn" style={{ fontSize: "13px", padding: "7px 14px" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
           <button
             type="button"
@@ -174,7 +167,7 @@ export default function ExerciseLanding({ onNavigate }) {
             { icon: "🏆", label: "Total Workouts", value: userStats.total,  color: "#6366f1" },
             { icon: "🔥", label: "Day Streak",     value: userStats.streak !== "—" ? userStats.streak + " days" : "—", color: "#ef4444" },
             { icon: "⭐", label: "Avg Accuracy",   value: userStats.score,  color: "#eab308" },
-            { icon: "📅", label: "Last Exercise",  value: userStats.lastEx, color: "#06b6d4" },
+            { icon: "CAL", label: "Last Exercise",  value: userStats.lastEx, color: "#06b6d4" },
           ].map((s, i) => (
             <div key={i} style={{
               padding: "18px 20px",
@@ -184,7 +177,7 @@ export default function ExerciseLanding({ onNavigate }) {
               boxShadow: theme === "light" ? "0 2px 12px rgba(0,0,0,0.08)" : "none",
               display: "flex", alignItems: "center", gap: "14px",
             }}>
-              <span style={{ fontSize: "26px" }}>{s.icon}</span>
+              {s.icon === "CAL" ? <img src="/calendar.png" alt="calendar" style={{ width:"30px", height:"30px", objectFit:"contain" }} /> : <span style={{ fontSize: "26px" }}>{s.icon}</span>}
               <div>
                 <div style={{ fontSize: "20px", fontWeight: "700", color: s.color }}>{s.value}</div>
                 <div style={{ fontSize: "12px", color: theme === "light" ? "#64748b" : "rgba(255,255,255,0.4)", marginTop: "2px" }}>{s.label}</div>
@@ -216,6 +209,7 @@ export default function ExerciseLanding({ onNavigate }) {
                 onClick={() => handleSelect(ex)}
                 style={{
                   display: "flex", flexDirection: "column",
+                  width: "100%",
                   alignItems: "center", justifyContent: "center",
                   gap: "0px", padding: "0px", overflow: "hidden",
                   background: isHovered ? c.color : theme === "light" ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.04)",
@@ -226,15 +220,15 @@ export default function ExerciseLanding({ onNavigate }) {
                   transition: "all 0.2s ease",
                   transform: isHovered ? "translateY(-4px)" : "none",
                   boxShadow: isHovered ? `0 16px 40px ${c.shadow}` : "none",
-                  height: "200px", minHeight: "unset",
+                  height: "234px", minHeight: "unset",
                 }}>
                 <img
                   src={ex.imageUrl}
                   alt={ex.name}
                   style={{
                     width: "100%",
-                    height: "200px",
-                    objectFit: "contain",
+                    height: "234px",
+                    objectFit: ex.id === "tree-pose" ? "cover" : "contain",
                     objectPosition: "center",
                     borderRadius: "12px 12px 12px 12px",
                     display: "block",

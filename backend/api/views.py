@@ -546,7 +546,8 @@ def _reset_exercise_counter(client_key: str, ex_type: str) -> None:
         }
     elif ex_type == "push_up":
         _PUSH_UP_RT_STATE[client_key] = {"stage": "up", "counter": 0}
-        _LUNGE_RT_STATE[client_key]    = {"stage": "up", "counter": 0}
+    elif ex_type == "lunge":
+        _LUNGE_RT_STATE[client_key] = {"stage": "up", "counter": 0}
     elif ex_type == "sit_up":
         _SITUP_RT_STATE[client_key] = {"stage": "down", "counter": 0}
     elif ex_type == "wall_sit":
