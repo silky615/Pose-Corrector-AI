@@ -2992,6 +2992,7 @@ def profile(request):
             if "age" in request.data: user.age = request.data["age"]
             if "height" in request.data: user.height = request.data["height"]
             if "weight" in request.data: user.weight = request.data["weight"]
+            if "weekly_target" in request.data: user.weekly_target = request.data["weekly_target"]
             user.save()
             return JsonResponse({"success": True})
         except Exception as e:
@@ -3062,6 +3063,12 @@ def profile(request):
         "age": user.age,
         "height": float(user.height) if user.height is not None else None,
         "weight": float(user.weight) if user.weight is not None else None,
+        "weeklyTarget": user.weekly_target if user.weekly_target is not None else None,
+        "weeklyMinsDone": round(sum(
+            max(0, (s.ended_at - s.started_at).total_seconds() / 60)
+            for s in sessions.filter(ended_at__date__gte=week_start)
+            if s.ended_at and s.started_at
+        )),
         "memberSince": user.created_at.strftime("%Y-%m-%d") if getattr(user, "created_at", None) else None,
 
         "totalWorkouts": total_workouts,
@@ -3251,15 +3258,19 @@ def chart_data(request):
 
         weekly_duration = [{"day": d, "minutes": weekly_dur.get(d, 0)} for d in day_labels]
 
+        from collections import defaultdict
+        grouped = defaultdict(lambda: defaultdict(list))
         for s in sessions:
             ex = s.exercise_type
             date_str = s.ended_at.astimezone(PST).strftime("%b %d")
-            if ex not in data:
-                data[ex] = []
-            data[ex].append({
-                "date": date_str,
-                "accuracy": float(s.avg_accuracy)
-            })
+            grouped[ex][date_str].append(float(s.avg_accuracy))
+        for ex, dates in grouped.items():
+            data[ex] = []
+            for date_str, accuracies in dates.items():
+                data[ex].append({
+                    "date": date_str,
+                    "accuracy": round(sum(accuracies) / len(accuracies), 1)
+                })
 
         return JsonResponse({"chartData": data, "weeklyDuration": weekly_duration})
     except Exception as e:
@@ -3290,6 +3301,7 @@ def reviews(request):
                            u.first_name, u.last_name, u.profile_pic
                     FROM reviews r
                     JOIN users u ON r.user_id = u.id
+                    WHERE r.comment IS NOT NULL AND r.comment != ''
                     ORDER BY r.created_at DESC LIMIT 20
                 """)
                 rows = cur.fetchall()

@@ -339,7 +339,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   async function handleDismissSummary() {
     // Auto-save review if stars selected
     const userId = localStorage.getItem("pc_demo_user_id");
-    if (userId && reviewStars > 0) {
+    if (userId && reviewStars > 0 && reviewComment.trim() !== "") {
       await api.submitReview(userId, exerciseId, reviewStars, reviewComment, sessionIdRef.current).catch(() => {});
     }
     totalPlankSecondsRef.current = 0; plankSecondsRef.current = 0;
@@ -414,6 +414,8 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     repAccuraciesRef.current = [];
     totalPlankSecondsRef.current = 0;
     plankSecondsRef.current = 0;
+    // Reset backend counter before starting live session
+    api.streamAnalysis(exerciseId, [], true).catch(() => {});
     if (userId) {
       api.startSession(userId, api.toBackendExerciseType(exerciseId), "live")
         .then(data => { sessionIdRef.current = data.session_id; })
@@ -866,7 +868,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                         </button>
                       </div>
                     </div>
-                    {liveFeedback.accuracy != null && <p className="exercise-feedback-accuracy">Accuracy: {Math.round(liveFeedback.accuracy)}%</p>}
+                    {liveFeedback != null && <p className="exercise-feedback-accuracy">Accuracy: {liveFeedback.accuracy != null && (exerciseId === "tree-pose" || exerciseId === "plank" ? plankSeconds > 0 : repAccuraciesRef.current.length >= 3) ? Math.round(liveFeedback.accuracy) : 0}%</p>}
                     {(exerciseId === "plank" || exerciseId === "tree-pose") && (
                       <p className="exercise-feedback-counter" style={{fontSize:"20px", fontWeight:"700", color: liveFeedback.posture_ok ? "#4ade80" : "#fca5a5"}}>
                         ⏱ {Math.floor(plankSeconds / 60).toString().padStart(2,"0")}:{(plankSeconds % 60).toString().padStart(2,"0")}

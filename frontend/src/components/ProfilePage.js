@@ -24,6 +24,7 @@ export default function ProfilePage({ onNavigate }) {
   const [age, setAge] = useState("");
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
+  const [weeklyTarget, setWeeklyTarget] = useState("");
   const [profileData, setProfileData] = useState(null);
   const [profilePic, setProfilePic] = useState("");
   const [loading, setLoading] = useState(true);
@@ -52,6 +53,20 @@ fetch(`/api/chart-data?user_id=${userId}`)
         setAge(data.age || "");
         setHeight(data.height || "");
         setWeight(data.weight || "");
+        // Check if 8 days passed since target was set
+        const targetSetDate = localStorage.getItem("pc_target_set_date");
+        const today = new Date().toISOString().slice(0,10);
+        if (targetSetDate) {
+          const daysDiff = Math.floor((new Date(today) - new Date(targetSetDate)) / (1000*60*60*24));
+          if (daysDiff >= 8) {
+            setWeeklyTarget("0");
+            localStorage.removeItem("pc_target_set_date");
+          } else {
+            setWeeklyTarget(data.weeklyTarget != null ? String(data.weeklyTarget) : "0");
+          }
+        } else {
+          setWeeklyTarget(data.weeklyTarget != null ? String(data.weeklyTarget) : "0");
+        }
         fetch(`/api/profile/pic/get?user_id=${userId}`)
           .then(r => r.json())
           .then(pd => setProfilePic(pd.profile_pic || ""))
@@ -66,10 +81,11 @@ fetch(`/api/chart-data?user_id=${userId}`)
       const r = await fetch(`/api/profile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, age, height, weight })
+        body: JSON.stringify({ user_id: userId, age, height, weight, weekly_target: weeklyTarget })
       });
       const data = await r.json();
       if (data.success) {
+        localStorage.setItem("pc_target_set_date", new Date().toISOString().slice(0,10));
         setSaveMsg("Saved successfully!");
         setEditing(false);
         setTimeout(() => setSaveMsg(""), 2500);
@@ -85,7 +101,7 @@ fetch(`/api/chart-data?user_id=${userId}`)
   const stats = profileData ? [
     { label: "Total Workouts", value: profileData.totalWorkouts ?? 0, icon: "🏆", color: "#6366f1" },
     { label: "Streak", value: `${profileData.streakDays ?? 0} days`, icon: "🔥", color: "#ef4444" },
-    { label: "Avg Score", value: `${profileData.avgScore ?? 0}%`, icon: "⭐", color: "#eab308" },
+    { label: "Weekly Target", value: (() => { const t = profileData.weeklyTarget; const done = profileData.weeklyMinsDone || 0; if (!t || t === 0) return done + " mins done"; const d = localStorage.getItem("pc_target_set_date"); const days = d ? Math.max(0, 7 - Math.floor((new Date() - new Date(d)) / (1000*60*60*24))) : 0; return done + "/" + t + " mins\n" + days + " days left"; })(), icon: "⏳", color: "#7c3aed" },
     { label: "This Week", value: profileData.thisWeek ?? 0, icon: "CAL", color: "#06b6d4" },
   ] : [];
 
@@ -120,7 +136,7 @@ fetch(`/api/chart-data?user_id=${userId}`)
           <button type="button"
             onClick={() => onNavigate ? onNavigate("dashboard") : (window.location.hash = "dashboard")}
             style={{ background: "none", border: "none", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.6)", fontSize: "14px", cursor: "pointer", padding: isMobile ? "6px 8px" : "7px 14px" }}
-          >← Back</button>
+          >← Back to exercises</button>
           
           <button type="button" onClick={toggleTheme} className="su-theme-btn" style={{ fontSize: isMobile ? "11px" : "13px", padding: isMobile ? "5px 10px" : "7px 14px" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
           <button type="button"
@@ -176,7 +192,7 @@ fetch(`/api/chart-data?user_id=${userId}`)
               </div>
 
               {/* Age / Height / Weight */}
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 10 : 14, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(5, 1fr)", gap: isMobile ? 10 : 14, marginBottom: 16 }}>
                 {[
                   { label: "Age",    value: age,    setter: setAge,    unit: "yrs", icon: "🎂" },
                   { label: "Height", value: height, setter: setHeight, unit: "ft",  icon: "📏" },
@@ -235,10 +251,39 @@ fetch(`/api/chart-data?user_id=${userId}`)
                       <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                         <span style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: theme === "light" ? "#0f172a" : "#e6f7f9" }}>{bmi}</span>
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: bmiColor }}>{bmiCategory}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: "#7c3aed" }}>{bmiCategory}</span>
                     </div>
                   ) : null;
                 })()}
+
+                {/* Target card */}
+                <div style={{
+                  background: theme === "light" ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.05)",
+                  border: theme === "light" ? "1px solid rgba(30,64,175,0.5)" : "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 12,
+                  padding: isMobile ? "12px 10px" : "14px 16px",
+                  display: "flex", flexDirection: "column", gap: 6,
+                }}>
+                  <span style={{ fontSize: isMobile ? 10 : 11, opacity: 0.45, textTransform: "uppercase", letterSpacing: "0.06em" }}>Weekly Target</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="number" className="no-arrows"
+                      min="0"
+                      max="600"
+                      placeholder="mins"
+                      value={weeklyTarget}
+                      onChange={e => setWeeklyTarget(e.target.value)}
+                      style={{
+                        width: "70px", fontSize: isMobile ? 18 : 22, fontWeight: 700,
+                        color: theme === "light" ? "#0f172a" : "#e6f7f9",
+                        background: "transparent", border: "none", outline: "none",
+                        
+                      }}
+                    />
+                    <span style={{ fontSize: 13, color: theme === "light" ? "#64748b" : "rgba(255,255,255,0.5)" }}>mins/week</span>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#7c3aed" }}>Set your goal</span>
+                </div>
               </div>
 
               {/* Edit / Save button - below stats */}
@@ -261,12 +306,12 @@ fetch(`/api/chart-data?user_id=${userId}`)
                 <div key={s.label} style={{
                   background: theme === "light" ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.04)",
                   border: `1px solid ${s.color}80`,
-                  borderRadius: 16, padding: "20px",
-                  display: "flex", alignItems: "center", gap: "16px",
+                  borderRadius: 16, padding: "16px 20px",
+                  display: "flex", alignItems: "center", gap: "10px",
                 }}>
-                  {s.icon === "CAL" ? <img src="/calendar.png" alt="calendar" style={{ width:"32px", height:"32px", objectFit:"contain" }} /> : <span style={{ fontSize: "32px" }}>{s.icon}</span>}
+                  {s.icon === "CAL" ? <img src="/calendar.png" alt="calendar" style={{ width:"28px", height:"28px", objectFit:"contain" }} /> : <span style={{ fontSize: "28px" }}>{s.icon}</span>}
                   <div>
-                    <div style={{ fontSize: "28px", fontWeight: "800", color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: "18px", fontWeight: "800", color: s.color, lineHeight: 1.2, whiteSpace: "nowrap" }}>{s.value}</div>
                     <div style={{ fontSize: "13px", color: theme === "light" ? "#64748b" : "rgba(255,255,255,0.4)", marginTop: "2px" }}>{s.label}</div>
                   </div>
                 </div>
