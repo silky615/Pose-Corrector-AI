@@ -94,7 +94,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   const [isMuted, setIsMuted] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [showWarmup, setShowWarmup] = useState(false);
-  const [warmupSeconds, setWarmupSeconds] = useState(300);
+  const [warmupSeconds, setWarmupSeconds] = useState(120);
   const warmupTimerRef = useRef(null);
   const pendingLiveStartRef = useRef(false);
   const mediaRecorderRef = useRef(null);
@@ -275,7 +275,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                       }
                     }
                   }
-                  if (data.accuracy) repAccuraciesRef.current.push(data.accuracy);
+                  if (data.accuracy != null && data.accuracy > 0) repAccuraciesRef.current.push(data.accuracy);
                   if (data.counter !== undefined && data.counter !== null) {
                     if (startCounterRef.current === -1) startCounterRef.current = data.counter;
                     const relativeCount = data.counter - startCounterRef.current;
@@ -301,6 +301,8 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [mode, stream, exerciseId]);
+
+  const [menuOpen, setMenuOpen] = React.useState(false);
 
   function handleSignOut() {
     if (stream) stream.getTracks().forEach((t) => t.stop());
@@ -356,7 +358,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
 
   function startLiveCamera() {
     // Show warm-up popup first
-    setWarmupSeconds(300);
+    setWarmupSeconds(120);
     setShowWarmup(true);
     pendingLiveStartRef.current = true;
     warmupTimerRef.current = setInterval(() => {
@@ -366,7 +368,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
           warmupTimerRef.current = null;
           setShowWarmup(false);
           startLiveCamera();
-          return 300;
+          return 120;
         }
         return prev - 1;
       });
@@ -422,7 +424,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
         .catch(() => {});
     }
     // Show warm-up popup first
-    setWarmupSeconds(300);
+    setWarmupSeconds(120);
     setShowWarmup(true);
     warmupTimerRef.current = setInterval(() => {
       setWarmupSeconds(prev => {
@@ -431,7 +433,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
           warmupTimerRef.current = null;
           setShowWarmup(false);
           setMode("live"); setUploadError(""); setLiveError(""); setLiveFeedback(null); setAnalyzing(true);
-          return 300;
+          return 120;
         }
         return prev - 1;
       });
@@ -672,7 +674,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
               Warm Up First!
             </h2>
             <p style={{ margin: "0 0 20px", fontSize: "14px", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.6)", lineHeight: 1.6, textAlign: "center" }}>
-              5 minutes of warm-up prevents injuries and improves performance.
+              2 minutes of warm-up prevents injuries and improves performance.
             </p>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "24px", marginBottom: "24px" }}>
               <img src="/warmup.png" alt="warmup" style={{ width: "180px", height: "180px", objectFit: "contain" }} />
@@ -681,7 +683,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                   <circle cx="70" cy="70" r="60" fill="none" stroke={theme === "light" ? "#e2e8f0" : "rgba(255,255,255,0.1)"} strokeWidth="8" />
                   <circle cx="70" cy="70" r="60" fill="none" stroke="#7c3aed" strokeWidth="8"
                     strokeDasharray={String(2 * Math.PI * 60)}
-                    strokeDashoffset={String(2 * Math.PI * 60 * (warmupSeconds / 300))}
+                    strokeDashoffset={String(2 * Math.PI * 60 * (warmupSeconds / 120))}
                     strokeLinecap="round"
                     style={{ transition: "stroke-dashoffset 1s linear" }}
                   />
@@ -697,7 +699,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
             </div>
             <button onClick={() => {
               if (warmupTimerRef.current) { clearInterval(warmupTimerRef.current); warmupTimerRef.current = null; }
-              setShowWarmup(false); setWarmupSeconds(300);
+              setShowWarmup(false); setWarmupSeconds(120);
               setMode("live"); setUploadError(""); setLiveError(""); setLiveFeedback(null); setAnalyzing(true);
             }} style={{
               width: "100%", padding: "14px", borderRadius: "12px", border: "none", cursor: "pointer",
@@ -715,11 +717,27 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
           <span style={{ fontWeight:"600", fontSize:"16px", color: theme === "light" ? "#0f172a" : "#e6f7f9" }}>Pose Corrector AI</span>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-          
-          <button type="button" onClick={toggleTheme} className="su-theme-btn" style={{ fontSize:"13px", padding:"7px 14px" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
-          <button type="button" onClick={handleSignOut} className="su-theme-btn" style={{ fontSize:"13px", padding:"7px 14px" }}>Sign out</button>
+          {/* Desktop buttons */}
+          <button type="button" onClick={toggleTheme} className="su-theme-btn" style={{ fontSize:"13px", padding:"7px 14px", display: window.innerWidth < 640 ? "none" : "block" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
+          <button type="button" onClick={handleSignOut} className="su-theme-btn" style={{ fontSize:"13px", padding:"7px 14px", display: window.innerWidth < 640 ? "none" : "block" }}>Sign out</button>
+          {/* Mobile hamburger */}
+          <button onClick={() => setMenuOpen(true)} style={{ display: window.innerWidth < 640 ? "flex" : "none", flexDirection:"column", justifyContent:"center", alignItems:"center", gap:"5px", background:"none", border:"none", cursor:"pointer", padding:"4px" }}>
+            <span style={{ display:"block", width:"22px", height:"2px", background: theme === "light" ? "#0f172a" : "white", borderRadius:"2px" }} />
+            <span style={{ display:"block", width:"22px", height:"2px", background: theme === "light" ? "#0f172a" : "white", borderRadius:"2px" }} />
+            <span style={{ display:"block", width:"22px", height:"2px", background: theme === "light" ? "#0f172a" : "white", borderRadius:"2px" }} />
+          </button>
         </div>
       </header>
+      {/* Mobile slide-in menu */}
+      {menuOpen && (
+        <div onClick={() => setMenuOpen(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:1002 }}>
+          <div onClick={e => e.stopPropagation()} style={{ position:"absolute", top:0, right:0, width:"220px", height:"100%", background: theme === "light" ? "white" : "#0f172a", boxShadow:"-4px 0 20px rgba(0,0,0,0.2)", padding:"24px 20px", display:"flex", flexDirection:"column", gap:"16px" }}>
+            <button onClick={() => setMenuOpen(false)} style={{ alignSelf:"flex-end", background:"none", border:"none", fontSize:"22px", cursor:"pointer", color: theme === "light" ? "#0f172a" : "white" }}>✕</button>
+            <button onClick={() => { toggleTheme(); setMenuOpen(false); }} className="su-theme-btn" style={{ width:"100%", textAlign:"center" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
+            <button onClick={() => { handleSignOut(); setMenuOpen(false); }} className="su-theme-btn" style={{ width:"100%", textAlign:"center" }}>Sign Out</button>
+          </div>
+        </div>
+      )}
 
       <main style={{ flex:1, maxWidth:"1400px", width:"100%", margin:"0 auto", padding:"32px 48px 64px", boxSizing:"border-box" }}>
 
@@ -794,9 +812,9 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                 {exercise.muscles?.length > 0 && (
                   <div>
                     <p style={{ margin:"0 0 10px", fontSize:"13px", fontWeight:"600", color: theme === "light" ? "#64748b" : "rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"1px" }}>Muscles Targeted</p>
-                    <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
+                    <div style={{ display:"flex", flexWrap:"nowrap", gap:"8px", width:"100%" }}>
                       {exercise.muscles.map((m, i) => (
-                        <span key={i} style={{ padding:"5px 14px", borderRadius:"20px", fontSize:"13px", background:"rgba(34,197,94,0.15)", border:"1px solid rgba(34,197,94,0.6)", color:"#16a34a" }}>{m}</span>
+                        <span key={i} style={{ flex:"1", textAlign:"center", padding:"6px 0", borderRadius:"20px", fontSize:"13px", fontWeight:"600", background:"rgba(34,197,94,0.15)", border:"1px solid rgba(34,197,94,0.6)", color:"#16a34a", whiteSpace:"nowrap" }}>{m}</span>
                       ))}
                     </div>
                   </div>
@@ -857,9 +875,9 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
                 </div>
                 {liveFeedback && (
                   <div className={`exercise-feedback${liveFeedback.posture_ok ? " posture-correct" : " posture-incorrect"}`} style={{ width:"100%", maxWidth:"none" }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px", flexWrap: window.innerWidth < 640 ? "wrap" : "nowrap" }}>
                       <p className="exercise-feedback-message" style={{margin:0}}>{liveFeedback.message || (liveFeedback.posture_ok ? "✅ Good form!" : "⚠️ Adjust your form")}</p>
-                      <div style={{ display:"flex", gap:"8px" }}>
+                      <div style={{ display:"flex", gap:"8px", width: window.innerWidth < 640 ? "100%" : "auto", marginTop: window.innerWidth < 640 ? "8px" : "0" }}>
                         <button type="button" onClick={() => { isMutedRef.current = !isMutedRef.current; setIsMuted(isMutedRef.current); window.speechSynthesis.cancel(); }} style={{ display:"flex", alignItems:"center", gap:"6px", background:"linear-gradient(135deg,#7c3aed,#06b6d4)", border:"none", borderRadius:"8px", color:"white", padding:"6px 14px", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>
                           {isMuted ? "🔇 Unmute" : "🔊 Mute"}
                         </button>
@@ -908,12 +926,12 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
           <div className="exercise-upload-wrap">
 
             <h2 style={{ margin:"0 0 16px", fontSize:"22px", fontWeight:"700", color: theme === "light" ? "#0f172a" : "white" }}>{exercise.name} — Upload Video</h2>
-            <label className="exercise-upload-label" style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+            <label className="exercise-upload-label" style={{ display:"flex", flexDirection: window.innerWidth < 640 ? "column" : "row", alignItems: window.innerWidth < 640 ? "flex-start" : "center", gap:"12px" }}>
               <span style={{ fontSize:"14px", fontWeight:"600", color: theme === "light" ? "#0f172a" : "white" }}>Select video file:</span>
               <span style={{ padding:"8px 20px", borderRadius:"10px", background:"linear-gradient(135deg,#7c3aed,#06b6d4)", color:"white", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Choose File</span>
               <input type="file" accept="video/*" onChange={handleUploadChange} className="exercise-upload-input" style={{ display:"none" }} />
             {!analyzing && !uploadSuccess && uploadVideoUrl && (
-              <button type="button" className="btn primary" onClick={handleUploadSubmit} style={{ marginLeft:"12px" }}>Analyse Video</button>
+              <button type="button" className="btn primary" onClick={handleUploadSubmit} style={{ marginLeft: window.innerWidth < 640 ? "0" : "12px" }}>Analyse Video</button>
             )}
             {analyzing && <span style={{marginLeft:"16px", fontSize:"14px", fontWeight:"600", color:"#06b6d4"}}>Analysing... {uploadProgress}%</span>}
             </label>

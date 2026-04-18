@@ -35,6 +35,7 @@ export default function ProfilePage({ onNavigate }) {
   const [selectedEx, setSelectedEx] = useState("");
   const isMobile = useIsMobile();
   const { theme, toggleTheme } = useTheme();
+  const [menuOpen, setMenuOpen] = React.useState(false);
 
   const userId = localStorage.getItem("pc_demo_user_id");
   const userName = localStorage.getItem("pc_demo_username") || localStorage.getItem("pc_demo_email") || "User";
@@ -86,7 +87,7 @@ fetch(`/api/chart-data?user_id=${userId}`)
       const data = await r.json();
       if (data.success) {
         localStorage.setItem("pc_target_set_date", new Date().toISOString().slice(0,10));
-        setSaveMsg("Saved successfully!");
+        setSaveMsg("Saved successfully!"); setProfileData(prev => ({ ...prev, weeklyTarget: parseInt(weeklyTarget) || 0, weeklyMinsDone: 0 }));
         setEditing(false);
         setTimeout(() => setSaveMsg(""), 2500);
       } else {
@@ -102,7 +103,7 @@ fetch(`/api/chart-data?user_id=${userId}`)
     { label: "Total Workouts", value: profileData.totalWorkouts ?? 0, icon: "🏆", color: "#6366f1" },
     { label: "Streak", value: `${profileData.streakDays ?? 0} days`, icon: "🔥", color: "#ef4444" },
     { label: "Weekly Target", value: (() => { const t = profileData.weeklyTarget; const done = profileData.weeklyMinsDone || 0; if (!t || t === 0) return done + " mins done"; const d = localStorage.getItem("pc_target_set_date"); const days = d ? Math.max(0, 7 - Math.floor((new Date() - new Date(d)) / (1000*60*60*24))) : 0; return done + "/" + t + " mins\n" + days + " days left"; })(), icon: "⏳", color: "#7c3aed" },
-    { label: "This Week", value: profileData.thisWeek ?? 0, icon: "CAL", color: "#06b6d4" },
+    { label: "Sessions This Week", value: profileData.thisWeek ?? 0, icon: "CAL", color: "#06b6d4" },
   ] : [];
 
   const recentWorkouts = profileData?.recentWorkouts || [];
@@ -133,12 +134,12 @@ fetch(`/api/chart-data?user_id=${userId}`)
           <span style={{ fontWeight: "600", fontSize: "16px", color: theme === "light" ? "#0f172a" : "#e6f7f9" }}>Pose Corrector AI</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 16 }}>
+          {/* Desktop buttons */}
           <button type="button"
             onClick={() => onNavigate ? onNavigate("dashboard") : (window.location.hash = "dashboard")}
-            style={{ background: "none", border: "none", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.6)", fontSize: "14px", cursor: "pointer", padding: isMobile ? "6px 8px" : "7px 14px" }}
+            style={{ background: "none", border: "none", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.6)", fontSize: "14px", cursor: "pointer", padding: "7px 14px", display: isMobile ? "none" : "block" }}
           >← Back to exercises</button>
-          
-          <button type="button" onClick={toggleTheme} className="su-theme-btn" style={{ fontSize: isMobile ? "11px" : "13px", padding: isMobile ? "5px 10px" : "7px 14px" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
+          <button type="button" onClick={toggleTheme} className="su-theme-btn" style={{ fontSize: "13px", padding: "7px 14px", display: isMobile ? "none" : "block" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
           <button type="button"
             onClick={() => {
               localStorage.removeItem("pc_demo_email");
@@ -146,10 +147,27 @@ fetch(`/api/chart-data?user_id=${userId}`)
               localStorage.removeItem("pc_demo_user_id");
               onNavigate ? onNavigate("signin") : (window.location.hash = "signin");
             }}
-            className="su-theme-btn" style={{ fontSize: isMobile ? "11px" : "13px", padding: isMobile ? "5px 10px" : "7px 14px" }}
+            className="su-theme-btn" style={{ fontSize: "13px", padding: "7px 14px", display: isMobile ? "none" : "block" }}
           >Sign out</button>
+          {/* Mobile hamburger */}
+          <button onClick={() => setMenuOpen(true)} style={{ display: isMobile ? "flex" : "none", flexDirection:"column", justifyContent:"center", alignItems:"center", gap:"5px", background:"none", border:"none", cursor:"pointer", padding:"4px" }}>
+            <span style={{ display:"block", width:"22px", height:"2px", background: theme === "light" ? "#0f172a" : "white", borderRadius:"2px" }} />
+            <span style={{ display:"block", width:"22px", height:"2px", background: theme === "light" ? "#0f172a" : "white", borderRadius:"2px" }} />
+            <span style={{ display:"block", width:"22px", height:"2px", background: theme === "light" ? "#0f172a" : "white", borderRadius:"2px" }} />
+          </button>
         </div>
       </header>
+      {/* Mobile slide-in menu */}
+      {menuOpen && (
+        <div onClick={() => setMenuOpen(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:1002 }}>
+          <div onClick={e => e.stopPropagation()} style={{ position:"absolute", top:0, right:0, width:"220px", height:"100%", background: theme === "light" ? "white" : "#0f172a", boxShadow:"-4px 0 20px rgba(0,0,0,0.2)", padding:"24px 20px", display:"flex", flexDirection:"column", gap:"16px" }}>
+            <button onClick={() => setMenuOpen(false)} style={{ alignSelf:"flex-end", background:"none", border:"none", fontSize:"22px", cursor:"pointer", color: theme === "light" ? "#0f172a" : "white" }}>✕</button>
+            <button onClick={() => { onNavigate ? onNavigate("dashboard") : (window.location.hash = "dashboard"); setMenuOpen(false); }} className="su-theme-btn" style={{ width:"100%", textAlign:"center" }}>← Back to exercises</button>
+            <button onClick={() => { toggleTheme(); setMenuOpen(false); }} className="su-theme-btn" style={{ width:"100%", textAlign:"center" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
+            <button onClick={() => { localStorage.removeItem("pc_demo_email"); localStorage.removeItem("pc_demo_username"); localStorage.removeItem("pc_demo_user_id"); onNavigate ? onNavigate("signin") : (window.location.hash = "signin"); }} className="su-theme-btn" style={{ width:"100%", textAlign:"center" }}>Sign Out</button>
+          </div>
+        </div>
+      )}
 
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "20px 16px" : "32px 40px" }}>
 
@@ -213,7 +231,7 @@ fetch(`/api/chart-data?user_id=${userId}`)
                           onChange={(e) => field.setter(e.target.value)}
                           style={{
                             background: "transparent", border: "none",
-                            borderBottom: "1px solid rgba(255,255,255,0.35)",
+                            borderBottom: editing ? `1px solid ${theme === "light" ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.35)"}` : "none",
                             color: theme === "light" ? "#0f172a" : "#e6f7f9", fontSize: isMobile ? 17 : 20, fontWeight: 700,
                             padding: "2px 0", outline: "none", width: isMobile ? "44px" : "60px",
                           }}
@@ -274,9 +292,9 @@ fetch(`/api/chart-data?user_id=${userId}`)
                       value={weeklyTarget}
                       onChange={e => setWeeklyTarget(e.target.value)}
                       style={{
-                        width: "70px", fontSize: isMobile ? 18 : 22, fontWeight: 700,
+                        width: "100%", fontSize: isMobile ? 18 : 22, fontWeight: 700,
                         color: theme === "light" ? "#0f172a" : "#e6f7f9",
-                        background: "transparent", border: "none", outline: "none",
+                        background: "transparent", border: "none", borderBottom: editing ? `1px solid ${theme === "light" ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.35)"}` : "none", outline: "none", boxSizing: "border-box",
                         
                       }}
                     />

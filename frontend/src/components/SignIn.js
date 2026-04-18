@@ -2,28 +2,30 @@ import React, { useState, useEffect } from "react";
 import * as api from "../api";
 import useTheme from "../useTheme";
 
-function ReviewsMini({ isLight }) {
-  const [reviews, setReviews] = React.useState([]);
-  React.useEffect(() => {
-    fetch("/api/reviews")
-      .then(r => r.json())
-      .then(d => setReviews((d.reviews || []).slice(0, 4)))
-      .catch(() => {});
-  }, []);
-  if (reviews.length === 0) return null;
+function ReviewCarousel({ reviews, isLight }) {
+  const scrollRef = React.useRef(null);
+  const scroll = (dir) => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft += dir * 210;
+    }
+  };
+  if (!reviews.length) return null;
+  const colors = ["#6366f1","#06b6d4","#ef4444","#eab308"];
+  const shortName = (name) => { const parts = name.trim().split(" "); return parts.length > 1 ? parts[0] + " " + parts[parts.length-1].charAt(0) + "." : parts[0]; };
   return (
-    <div style={{ marginTop: "28px", width: "100%" }}>
-      <div style={{ fontSize: "13px", fontWeight: "600", color: isLight ? "#64748b" : "rgba(255,255,255,0.4)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.06em" }}>What users say</div>
-      <div style={{ display: "flex", flexDirection: "row", gap: "10px", overflowX: "auto", flexWrap: "nowrap", width: "100%", paddingBottom: "6px" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "6px", width: "100%" }}>
+      <button onClick={() => scroll(-1)}
+        style={{ background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: isLight ? "#475569" : "rgba(255,255,255,0.5)", flexShrink: 0, padding: "2px" }}>&#8249;</button>
+      <div ref={scrollRef} style={{ display: "flex", flexDirection: "row", gap: "10px", overflowX: "scroll", flexWrap: "nowrap", flex: 1, paddingBottom: "4px", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}>
         {reviews.map((r, i) => (
-          <div key={i} style={{ padding: "16px", borderRadius: "8px", background: isLight ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.04)", border: `1px solid ${["#6366f1","#06b6d4","#ef4444","#eab308"][i % 4]}80`, minWidth: "180px", maxWidth: "180px", flexShrink: 0 }}>
+          <div key={i} style={{ padding: "16px", borderRadius: "8px", background: isLight ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.04)", border: `1px solid ${colors[i % 4]}80`, minWidth: "180px", maxWidth: "180px", flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
               {r.profile_pic
                 ? <img src={r.profile_pic} alt={r.name} style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover", border: "2px solid #7c3aed" }} />
                 : <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#06b6d4)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "700", fontSize: "13px" }}>{r.name.charAt(0).toUpperCase()}</div>
               }
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: "600", fontSize: "12px", color: isLight ? "#0f172a" : "white" }}>{r.name}</div>
+                <div style={{ fontWeight: "600", fontSize: "12px", color: isLight ? "#0f172a" : "white" }}>{shortName(r.name)}</div>
                 <div style={{ fontSize: "11px", color: isLight ? "#64748b" : "rgba(255,255,255,0.4)" }}>{"⭐".repeat(r.stars)}</div>
               </div>
             </div>
@@ -31,6 +33,25 @@ function ReviewsMini({ isLight }) {
           </div>
         ))}
       </div>
+      <button onClick={() => scroll(1)}
+        style={{ background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: isLight ? "#475569" : "rgba(255,255,255,0.5)", flexShrink: 0, padding: "2px" }}>&#8250;</button>
+    </div>
+  );
+}
+
+function ReviewsMini({ isLight }) {
+  const [reviews, setReviews] = React.useState([]);
+  React.useEffect(() => {
+    fetch("/api/reviews")
+      .then(r => r.json())
+      .then(d => setReviews((d.reviews || []).slice(0, 15)))
+      .catch(() => {});
+  }, []);
+  if (reviews.length === 0) return null;
+  return (
+    <div style={{ marginTop: "28px", width: "100%" }}>
+      <div style={{ fontSize: "13px", fontWeight: "600", color: isLight ? "#64748b" : "rgba(255,255,255,0.4)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.06em" }}>What users say</div>
+      <ReviewCarousel reviews={reviews} isLight={isLight} />
     </div>
   );
 }
@@ -55,6 +76,13 @@ export default function SignIn({ onNavigate }) {
     if (!re.test(email)) return "Enter a valid email";
     if (!password) return "Password is required";
     return "";
+  }
+
+  function handleGuestLogin() {
+    localStorage.setItem("pc_demo_email", "guest");
+    localStorage.setItem("pc_demo_username", "Guest");
+    localStorage.setItem("pc_demo_user_id", "0");
+    onNavigate("dashboard");
   }
 
   async function submit(e) {
@@ -86,11 +114,33 @@ export default function SignIn({ onNavigate }) {
 
   const isLight = theme === "light";
 
+  const [menuOpen, setMenuOpen] = React.useState(false);
+
   return (
     <>
-    <button onClick={toggleTheme} className="su-theme-btn" style={{ position: "fixed", top: "16px", right: "16px", zIndex: 1000 }}>
+    {/* Desktop theme button */}
+    <button onClick={toggleTheme} className="su-theme-btn" style={{ position: "fixed", top: "8px", right: "16px", zIndex: 1000, display: window.innerWidth < 640 ? "none" : "block" }}>
       {isLight ? "🌙 Dark Mode" : "☀️ Light Mode"}
     </button>
+
+    {/* Mobile hamburger button */}
+    <button onClick={() => setMenuOpen(true)} style={{ display: window.innerWidth < 640 ? "flex" : "none", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "5px", position: "fixed", top: "12px", right: "16px", zIndex: 1001, background: "none", border: "none", cursor: "pointer", padding: "4px" }}>
+      <span style={{ display: "block", width: "22px", height: "2px", background: isLight ? "#0f172a" : "white", borderRadius: "2px" }} />
+      <span style={{ display: "block", width: "22px", height: "2px", background: isLight ? "#0f172a" : "white", borderRadius: "2px" }} />
+      <span style={{ display: "block", width: "22px", height: "2px", background: isLight ? "#0f172a" : "white", borderRadius: "2px" }} />
+    </button>
+
+    {/* Mobile slide-in menu */}
+    {menuOpen && (
+      <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1002 }}>
+        <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, width: "220px", height: "100%", background: isLight ? "white" : "#0f172a", boxShadow: "-4px 0 20px rgba(0,0,0,0.2)", padding: "24px 20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+          <button onClick={() => setMenuOpen(false)} style={{ alignSelf: "flex-end", background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: isLight ? "#0f172a" : "white" }}>✕</button>
+          <button onClick={() => { toggleTheme(); setMenuOpen(false); }} className="su-theme-btn" style={{ width: "100%", textAlign: "center" }}>
+            {isLight ? "🌙 Dark Mode" : "☀️ Light Mode"}
+          </button>
+        </div>
+      </div>
+    )}
     <div className="si-wrap" style={{
       background: isLight
         ? "linear-gradient(180deg, #e0f2fe, #bae6fd)"
@@ -172,7 +222,7 @@ export default function SignIn({ onNavigate }) {
 
           <form onSubmit={submit} className="si-form">
             <div className="si-field">
-              <label className="si-label" style={{ color: isLight ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.7)" }}>Email address</label>
+              <label className="si-label" style={{ color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.9)" }}>Email address</label>
               <div style={{ position: "relative" }}>
                 
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
@@ -185,7 +235,7 @@ export default function SignIn({ onNavigate }) {
             </div>
 
             <div className="si-field">
-              <label className="si-label" style={{ color: isLight ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.7)" }}>Password</label>
+              <label className="si-label" style={{ color: isLight ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.9)" }}>Password</label>
               <div style={{ position: "relative" }}>
                 
                 <input type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
@@ -218,11 +268,21 @@ export default function SignIn({ onNavigate }) {
             <button type="button" onClick={() => onNavigate("signup")} className="su-btn-secondary">
               Create an account
             </button>
+
+            <div className="su-divider">
+              <span className="su-divider-line" style={{ background: isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)" }} />
+              <span className="su-divider-text" style={{ color: isLight ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.25)" }}>or</span>
+              <span className="su-divider-line" style={{ background: isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)" }} />
+            </div>
+
+            <button type="button" onClick={handleGuestLogin} style={{ width:"100%", padding:"13px", borderRadius:"10px", border:"2px dashed", borderColor: isLight ? "rgba(124,58,237,0.4)" : "rgba(255,255,255,0.2)", background:"none", color: isLight ? "#7c3aed" : "rgba(255,255,255,0.7)", fontSize:"15px", fontWeight:"600", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px" }}>
+              👤 Continue as Guest
+            </button>
           </form>
+          <div style={{ marginTop: "48px", overflow: "hidden", width: "calc(100% + 350px)", marginLeft: "-175px" }}>
+            <ReviewsMini isLight={isLight} />
+          </div>
         </div>
-        </div>
-        <div style={{ padding: "80px clamp(24px,6vw,56px) 32px", borderTop: isLight ? "1px solid rgba(0,0,0,0.06)" : "1px solid rgba(255,255,255,0.06)" }}>
-          <ReviewsMini isLight={isLight} />
         </div>
       </div>
     </div>
