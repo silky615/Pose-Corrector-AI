@@ -304,6 +304,8 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
 
   const [menuOpen, setMenuOpen] = React.useState(false);
 
+  const isGuest = localStorage.getItem("pc_demo_user_id") === "0";
+
   function handleSignOut() {
     if (stream) stream.getTracks().forEach((t) => t.stop());
     localStorage.removeItem("pc_demo_email");
@@ -319,7 +321,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     const reps = isTimer ? totalPlankSecondsRef.current : (maxCounterRef.current || (liveFeedback ? liveFeedback.counter || 0 : 0));
     const acc = repAccuraciesRef.current.length > 0 ? Math.round(repAccuraciesRef.current.reduce((a,b) => a+b, 0) / repAccuraciesRef.current.length) : (liveFeedback && liveFeedback.accuracy ? Math.round(liveFeedback.accuracy) : 0);
     if (sessionIdRef.current) {
-      api.endSession(sessionIdRef.current, reps, acc).catch(() => {});
+      if (!isGuest) api.endSession(sessionIdRef.current, reps, acc).catch(() => {});
       sessionIdRef.current = null;
     }
     if (mode === "live" && (reps > 0 || acc > 0)) {
@@ -341,7 +343,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
   async function handleDismissSummary() {
     // Auto-save review if stars selected
     const userId = localStorage.getItem("pc_demo_user_id");
-    if (userId && reviewStars > 0 && reviewComment.trim() !== "") {
+    if (userId && !isGuest && reviewStars > 0 && reviewComment.trim() !== "") {
       await api.submitReview(userId, exerciseId, reviewStars, reviewComment, sessionIdRef.current).catch(() => {});
     }
     totalPlankSecondsRef.current = 0; plankSecondsRef.current = 0;
@@ -418,7 +420,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     plankSecondsRef.current = 0;
     // Reset backend counter before starting live session
     api.streamAnalysis(exerciseId, [], true).catch(() => {});
-    if (userId) {
+    if (userId && !isGuest) {
       api.startSession(userId, api.toBackendExerciseType(exerciseId), "live")
         .then(data => { sessionIdRef.current = data.session_id; })
         .catch(() => {});
@@ -572,7 +574,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
       setUploadSuccess(true);
       setUploadProgress(100);
 
-      if (userId) {
+      if (userId && !isGuest) {
         const sid = await api.startSession(userId, api.toBackendExerciseType(exerciseId), "upload").then(d => d.session_id).catch(() => null);
         if (sid) await api.endSession(sid, maxReps, avgAccuracy).catch(() => {});
       }
@@ -603,11 +605,11 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
     const feedback = acc >= 90 ? "Excellent form! You crushed it!" : acc >= 75 ? "Great job! Keep pushing!" : acc >= 60 ? "Good effort! Focus on form next time." : "Keep practicing — you're improving!";
     return (
       <div style={{ minHeight:"100vh", width:"100%", background: theme === "light" ? "linear-gradient(180deg, #dbeafe, #bfdbfe)" : "radial-gradient(1200px 600px at 10% 20%, rgba(124,58,237,0.1), transparent), linear-gradient(180deg,#0f172a,#0b3140)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Inter, ui-sans-serif, system-ui, sans-serif" }}>
-        <div style={{ background: theme === "light" ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.05)", border: theme === "light" ? "1px solid rgba(30,64,175,0.3)" : "1px solid rgba(255,255,255,0.1)", borderRadius:24, padding:"48px 40px", maxWidth:480, width:"90%", textAlign:"center", boxShadow: theme === "light" ? "0 8px 32px rgba(0,0,0,0.12)" : "none" }}>
-          <div style={{ fontSize:80, marginBottom:16 }}>🏆</div>
+        <div style={{ background: theme === "light" ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.05)", border: theme === "light" ? "1px solid rgba(30,64,175,0.3)" : "1px solid rgba(255,255,255,0.1)", borderRadius:24, padding:"24px 28px", maxWidth:480, width:"90%", textAlign:"center", boxShadow: theme === "light" ? "0 8px 32px rgba(0,0,0,0.12)" : "none" }}>
+          <div style={{ fontSize:64, marginBottom:8 }}>🏆</div>
           <h1 style={{ margin:"0 0 8px", fontSize:28, fontWeight:800, color: theme === "light" ? "#0f172a" : "white" }}>Session Complete!</h1>
-          <p style={{ margin:"0 0 32px", fontSize:16, color: theme === "light" ? "#475569" : "rgba(255,255,255,0.5)" }}>{exerciseName}</p>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:32 }}>
+          <p style={{ margin:"0 0 12px", fontSize:16, color: theme === "light" ? "#475569" : "rgba(255,255,255,0.5)" }}>{exerciseName}</p>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:16 }}>
             <div style={{ background: theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.06)", border:"1px solid #6366f180", borderRadius:16, padding:"24px 16px" }}>
               <div style={{ fontSize:36, fontWeight:800, color:"#6366f1" }}>{isTimer ? `${reps}s` : reps}</div>
               <div style={{ fontSize:13, color: theme === "light" ? "#64748b" : "rgba(255,255,255,0.4)", marginTop:4 }}>{isTimer ? "Hold Time" : "Total Reps"}</div>
@@ -617,21 +619,22 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
               <div style={{ fontSize:13, color: theme === "light" ? "#64748b" : "rgba(255,255,255,0.4)", marginTop:4 }}>Avg Accuracy</div>
             </div>
           </div>
-          <div style={{ background: theme === "light" ? "rgba(99,102,241,0.08)" : "rgba(99,102,241,0.12)", border:"1px solid rgba(99,102,241,0.2)", borderRadius:12, padding:"16px 20px", marginBottom:32, fontSize:15, color: theme === "light" ? "#4338ca" : "#a5b4fc" }}>{feedback}</div>
+          <div style={{ background: theme === "light" ? "rgba(99,102,241,0.08)" : "rgba(99,102,241,0.12)", border:"1px solid rgba(99,102,241,0.2)", borderRadius:12, padding:"16px 20px", marginBottom:8, fontSize:15, color: theme === "light" ? "#4338ca" : "#a5b4fc" }}>{feedback}</div>
           {!reviewSubmitted ? (
-            <div style={{ marginBottom:24, textAlign:"left" }}>
-              <div style={{ fontSize:15, fontWeight:600, color: theme === "light" ? "#0f172a" : "white", marginBottom:10 }}>Rate your session</div>
-              <div style={{ display:"flex", gap:8, marginBottom:14, justifyContent:"center" }}>
+            <div style={{ marginBottom:8, textAlign:"left" }}>
+              <div style={{ fontSize:15, fontWeight:600, color: theme === "light" ? "#0f172a" : "white", marginBottom:6 }}>Rate your session</div>
+              <div style={{ display:"flex", gap:8, marginBottom:6, justifyContent:"center" }}>
                 {[1,2,3,4,5].map(s => (
-                  <span key={s} onClick={() => setReviewStars(s)} style={{ fontSize:32, cursor:"pointer", filter: s <= reviewStars ? "none" : "grayscale(1)", transition:"all 0.15s" }}>⭐</span>
+                  <span key={s} onClick={() => setReviewStars(s)} style={{ fontSize:26, cursor:"pointer", filter: s <= reviewStars ? "none" : "grayscale(1)", transition:"all 0.15s" }}>⭐</span>
                 ))}
               </div>
               <textarea
                 value={reviewComment}
-                onChange={e => setReviewComment(e.target.value)}
-                placeholder="Add a comment (optional)..."
+                onChange={e => !isGuest && setReviewComment(e.target.value)}
+                placeholder={isGuest ? "Sign in to leave a comment..." : "Add a comment (optional)..."}
                 rows={3}
-                style={{ width:"100%", borderRadius:10, border: theme === "light" ? "1px solid rgba(30,64,175,0.3)" : "1px solid rgba(255,255,255,0.15)", background: theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.05)", color: theme === "light" ? "#0f172a" : "white", padding:"10px 14px", fontSize:14, resize:"none", boxSizing:"border-box", outline:"none", marginBottom:10 }}
+                disabled={isGuest}
+                style={{ width:"100%", borderRadius:10, border: theme === "light" ? "1px solid rgba(30,64,175,0.3)" : "1px solid rgba(255,255,255,0.15)", background: isGuest ? (theme === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.02)") : (theme === "light" ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.05)"), color: theme === "light" ? "#0f172a" : "white", padding:"10px 14px", fontSize:14, resize:"none", boxSizing:"border-box", outline:"none", marginBottom:10, cursor: isGuest ? "not-allowed" : "text", opacity: isGuest ? 0.5 : 1 }}
               />
 
             </div>
@@ -719,7 +722,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
         <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
           {/* Desktop buttons */}
           <button type="button" onClick={toggleTheme} className="su-theme-btn" style={{ fontSize:"13px", padding:"7px 14px", display: window.innerWidth < 640 ? "none" : "block" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
-          <button type="button" onClick={handleSignOut} className="su-theme-btn" style={{ fontSize:"13px", padding:"7px 14px", display: window.innerWidth < 640 ? "none" : "block" }}>Sign out</button>
+          <button type="button" onClick={() => !isGuest && handleSignOut()} className="su-theme-btn" style={{ fontSize:"13px", padding:"7px 14px", display: window.innerWidth < 640 ? "none" : "block", opacity: isGuest ? 0.4 : 1, cursor: isGuest ? "not-allowed" : "pointer", filter: isGuest ? "grayscale(1)" : "none" }}>Sign out</button>
           {/* Mobile hamburger */}
           <button onClick={() => setMenuOpen(true)} style={{ display: window.innerWidth < 640 ? "flex" : "none", flexDirection:"column", justifyContent:"center", alignItems:"center", gap:"5px", background:"none", border:"none", cursor:"pointer", padding:"4px" }}>
             <span style={{ display:"block", width:"22px", height:"2px", background: theme === "light" ? "#0f172a" : "white", borderRadius:"2px" }} />
@@ -734,7 +737,7 @@ export default function ExercisePage({ exerciseId, onNavigate }) {
           <div onClick={e => e.stopPropagation()} style={{ position:"absolute", top:0, right:0, width:"220px", height:"100%", background: theme === "light" ? "white" : "#0f172a", boxShadow:"-4px 0 20px rgba(0,0,0,0.2)", padding:"24px 20px", display:"flex", flexDirection:"column", gap:"16px" }}>
             <button onClick={() => setMenuOpen(false)} style={{ alignSelf:"flex-end", background:"none", border:"none", fontSize:"22px", cursor:"pointer", color: theme === "light" ? "#0f172a" : "white" }}>✕</button>
             <button onClick={() => { toggleTheme(); setMenuOpen(false); }} className="su-theme-btn" style={{ width:"100%", textAlign:"center" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
-            <button onClick={() => { handleSignOut(); setMenuOpen(false); }} className="su-theme-btn" style={{ width:"100%", textAlign:"center" }}>Sign Out</button>
+            <button onClick={() => { if(!isGuest){ handleSignOut(); setMenuOpen(false); } }} className="su-theme-btn" style={{ width:"100%", textAlign:"center", opacity: isGuest ? 0.4 : 1, cursor: isGuest ? "not-allowed" : "pointer", filter: isGuest ? "grayscale(1)" : "none" }}>Sign Out</button>
           </div>
         </div>
       )}

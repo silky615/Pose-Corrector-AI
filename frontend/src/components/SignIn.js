@@ -56,6 +56,42 @@ function ReviewsMini({ isLight }) {
   );
 }
 
+
+function ReviewsMobile({ isLight }) {
+  const [reviews, setReviews] = React.useState([]);
+  React.useEffect(() => {
+    fetch("/api/reviews")
+      .then(r => r.json())
+      .then(d => setReviews((d.reviews || []).slice(0, 4)))
+      .catch(() => {});
+  }, []);
+  if (reviews.length === 0) return null;
+  const colors = ["#6366f1","#06b6d4","#ef4444","#eab308"];
+  const shortName = (name) => { const parts = name.trim().split(" "); return parts.length > 1 ? parts[0] + " " + parts[parts.length-1].charAt(0) + "." : parts[0]; };
+  return (
+    <div style={{ marginTop: "28px", width: "100%" }}>
+      <div style={{ fontSize: "13px", fontWeight: "600", color: isLight ? "#64748b" : "rgba(255,255,255,0.4)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.06em" }}>What users say</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+        {reviews.map((r, i) => (
+          <div key={i} style={{ padding: "12px", borderRadius: "8px", background: isLight ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.04)", border: `1px solid ${colors[i % 4]}80`, boxSizing: "border-box" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+              {r.profile_pic
+                ? <img src={r.profile_pic} alt={r.name} style={{ width: "28px", height: "28px", borderRadius: "50%", objectFit: "cover", border: "2px solid #7c3aed" }} />
+                : <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#06b6d4)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "700", fontSize: "11px", flexShrink: 0 }}>{r.name.charAt(0).toUpperCase()}</div>
+              }
+              <div>
+                <div style={{ fontWeight: "600", fontSize: "11px", color: isLight ? "#0f172a" : "white" }}>{shortName(r.name)}</div>
+                <div style={{ fontSize: "10px" }}>{"⭐".repeat(r.stars)}</div>
+              </div>
+            </div>
+            {r.comment && <div style={{ fontSize: "11px", color: isLight ? "#475569" : "rgba(255,255,255,0.5)", fontStyle: "italic", lineHeight: 1.4 }}>"{r.comment}"</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function SignIn({ onNavigate }) {
   const { theme, toggleTheme } = useTheme();
   const [email, setEmail] = useState("");
@@ -117,7 +153,7 @@ export default function SignIn({ onNavigate }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
 
   return (
-    <>
+    <div style={{ width: "100%", maxWidth: "100vw", overflowX: "hidden", position: "relative" }}>
     {/* Desktop theme button */}
     <button onClick={toggleTheme} className="su-theme-btn" style={{ position: "fixed", top: "8px", right: "16px", zIndex: 1000, display: window.innerWidth < 640 ? "none" : "block" }}>
       {isLight ? "🌙 Dark Mode" : "☀️ Light Mode"}
@@ -141,7 +177,7 @@ export default function SignIn({ onNavigate }) {
         </div>
       </div>
     )}
-    <div className="si-wrap" style={{
+    <div className="si-wrap" style={{ overflowX: "hidden", width: "100%", maxWidth: "100%",
       background: isLight
         ? "linear-gradient(180deg, #e0f2fe, #bae6fd)"
         : "radial-gradient(1200px 600px at 10% 20%, rgba(124,58,237,0.12), transparent), radial-gradient(800px 400px at 90% 80%, rgba(6,182,212,0.08), transparent), linear-gradient(180deg,#0f172a,#0b3140)",
@@ -210,7 +246,7 @@ export default function SignIn({ onNavigate }) {
 
       {/* RIGHT PANEL */}
       <div style={{ flex: "1 1 300px", display: "flex", flexDirection: "column", background: isLight ? "#ffffff" : "rgba(11,18,33,0.98)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "clamp(60px,8vw,100px) clamp(24px,6vw,56px) 24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "clamp(60px,8vw,100px) clamp(24px,6vw,56px) 24px", width: "100%", boxSizing: "border-box", overflowX: "hidden" }}>
         <div className="si-right-inner">
 
           <div className="si-welcome">
@@ -279,13 +315,18 @@ export default function SignIn({ onNavigate }) {
               👤 Continue as Guest
             </button>
           </form>
-          <div style={{ marginTop: "48px", overflow: "hidden", width: "calc(100% + 350px)", marginLeft: "-175px" }}>
-            <ReviewsMini isLight={isLight} />
-          </div>
+          {window.innerWidth < 640 && (
+            <ReviewsMobile isLight={isLight} />
+          )}
+          {window.innerWidth >= 640 && (
+            <div style={{ marginTop: "32px", overflow: "hidden", width: "calc(100% + 350px)", marginLeft: "-175px" }}>
+              <ReviewsMini isLight={isLight} />
+            </div>
+          )}
         </div>
         </div>
       </div>
     </div>
-    </>
+    </div>
   );
 }

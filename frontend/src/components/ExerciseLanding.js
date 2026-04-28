@@ -95,6 +95,7 @@ export default function ExerciseLanding({ onNavigate }) {
     onNavigate(`exercise-${exercise.id}`);
   }
 
+  const isGuest = displayName === "Guest" || localStorage.getItem("pc_demo_user_id") === "0";
   const welcomeName = displayName
     ? displayName.charAt(0).toUpperCase() + displayName.slice(1)
     : "Guest";
@@ -113,9 +114,9 @@ export default function ExerciseLanding({ onNavigate }) {
         <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1002 }}>
           <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: 0, right: 0, width: "220px", height: "100%", background: theme === "light" ? "white" : "#0f172a", boxShadow: "-4px 0 20px rgba(0,0,0,0.2)", padding: "24px 20px", display: "flex", flexDirection: "column", gap: "16px" }}>
             <button onClick={() => setMenuOpen(false)} style={{ alignSelf: "flex-end", background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: theme === "light" ? "#0f172a" : "white" }}>✕</button>
-            <button onClick={() => { onNavigate("profile"); setMenuOpen(false); }} className="su-theme-btn" style={{ width: "100%", textAlign: "center" }}>Profile</button>
+            <button onClick={() => { if(!isGuest){ onNavigate("profile"); setMenuOpen(false); } }} className="su-theme-btn" style={{ width: "100%", textAlign: "center", opacity: isGuest ? 0.4 : 1, cursor: isGuest ? "not-allowed" : "pointer", filter: isGuest ? "grayscale(1)" : "none" }}>Profile</button>
             <button onClick={() => { toggleTheme(); setMenuOpen(false); }} className="su-theme-btn" style={{ width: "100%", textAlign: "center" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
-            <button onClick={() => { handleSignOut(); setMenuOpen(false); }} className="su-theme-btn" style={{ width: "100%", textAlign: "center" }}>Sign Out</button>
+            <button onClick={() => { if(!isGuest){ handleSignOut(); setMenuOpen(false); } }} className="su-theme-btn" style={{ width: "100%", textAlign: "center", opacity: isGuest ? 0.4 : 1, cursor: isGuest ? "not-allowed" : "pointer", filter: isGuest ? "grayscale(1)" : "none" }}>Sign Out</button>
           </div>
         </div>
       )}
@@ -140,9 +141,9 @@ export default function ExerciseLanding({ onNavigate }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
           {/* Desktop nav buttons */}
-          <button type="button" onClick={() => onNavigate("profile")} className="su-theme-btn" style={{ fontSize: "13px", padding: "7px 14px", display: window.innerWidth < 640 ? "none" : "block" }}>Profile</button>
+          <button type="button" onClick={() => !isGuest && onNavigate("profile")} className="su-theme-btn" style={{ fontSize: "13px", padding: "7px 14px", display: window.innerWidth < 640 ? "none" : "block", opacity: isGuest ? 0.4 : 1, cursor: isGuest ? "not-allowed" : "pointer", filter: isGuest ? "grayscale(1)" : "none" }}>Profile</button>
           <button onClick={toggleTheme} className="su-theme-btn" style={{ fontSize: "13px", padding: "7px 14px", display: window.innerWidth < 640 ? "none" : "block" }}>{theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}</button>
-          <button type="button" onClick={handleSignOut} className="su-theme-btn" style={{ fontSize: "13px", padding: "7px 14px", display: window.innerWidth < 640 ? "none" : "block" }}>Sign out</button>
+          <button type="button" onClick={() => !isGuest && handleSignOut()} className="su-theme-btn" style={{ fontSize: "13px", padding: "7px 14px", display: window.innerWidth < 640 ? "none" : "block", opacity: isGuest ? 0.4 : 1, cursor: isGuest ? "not-allowed" : "pointer", filter: isGuest ? "grayscale(1)" : "none" }}>Sign out</button>
           {/* Mobile hamburger */}
           <button onClick={() => setMenuOpen(true)} style={{ display: window.innerWidth < 640 ? "flex" : "none", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "5px", background: "none", border: "none", cursor: "pointer", padding: "4px" }}>
             <span style={{ display: "block", width: "22px", height: "2px", background: theme === "light" ? "#0f172a" : "white", borderRadius: "2px" }} />
@@ -165,7 +166,7 @@ export default function ExerciseLanding({ onNavigate }) {
             background: theme === "light" ? "none" : "linear-gradient(135deg, #e6f7f9, #bcd4d9)",
             WebkitBackgroundClip: theme === "light" ? "unset" : "text",
             WebkitTextFillColor: theme === "light" ? "#0f172a" : "transparent",
-          }}>Welcome back, {welcomeName}! 👋</h1>
+          }}>Welcome, {welcomeName}! 👋</h1>
           <p style={{ margin: 0, fontSize: "17px", color: theme === "light" ? "#475569" : "rgba(255,255,255,0.45)" }}>
             Choose an exercise below and let's get moving.
           </p>
